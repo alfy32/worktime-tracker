@@ -1,6 +1,8 @@
+import importlib
 import json
 import os
 import sys
+import unittest.mock as mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'agents', 'ubuntu'))
 from sync import parse_events
@@ -111,3 +113,45 @@ class TestParseEvents:
     def test_missing_timestamp_skipped(self):
         lines = [json.dumps({'MESSAGE': 'New session c1 of user alan on seat seat0.'})]
         assert parse_events(lines) == []
+
+
+class TestLoadConfig:
+    def test_reads_from_env_vars(self):
+        with mock.patch.dict(os.environ, {
+            'WORKTIME_SERVER_URL': 'http://192.168.1.10:8000',
+            'WORKTIME_COMPUTER_NAME': 'mydesktop',
+        }):
+            from sync import load_config
+            url, name = load_config()
+        assert url == 'http://192.168.1.10:8000'
+        assert name == 'mydesktop'
+
+    def test_trailing_slash_stripped_from_url(self):
+        with mock.patch.dict(os.environ, {
+            'WORKTIME_SERVER_URL': 'http://192.168.1.10:8000/',
+            'WORKTIME_COMPUTER_NAME': 'mydesktop',
+        }):
+            from sync import load_config
+            url, _ = load_config()
+        assert url == 'http://192.168.1.10:8000'
+
+    def test_missing_url_exits(self):
+        env = {k: v for k, v in os.environ.items()
+               if k not in ('WORKTIME_SERVER_URL', 'WORKTIME_COMPUTER_NAME')}
+        # Ensure no config file is found by patching expanduser
+        with mock.patch.dict(os.environ, env, clear=True), \
+             mock.patch('os.path.exists', return_value=False):
+            import pytest
+            from sync import load_config
+            with pytest.raises(SystemExit):
+                load_config()
+
+    def test_hostname_used_when_name_not_set(self):
+        env_copy = {k: v for k, v in os.environ.items() if k != 'WORKTIME_COMPUTER_NAME'}
+        env_copy['WORKTIME_SERVER_URL'] = 'http://192.168.1.10:8000'
+        with mock.patch.dict(os.environ, env_copy, clear=True), \
+             mock.patch('os.path.exists', return_value=False), \
+             mock.patch('socket.gethostname', return_value='testhost'):
+            from sync import load_config
+            _, name = load_config()
+        assert name == 'testhost'
