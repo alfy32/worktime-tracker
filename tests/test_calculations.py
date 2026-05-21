@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, date, timedelta
 from calculations import get_sessions, merge_intervals, calculate_work_hours, calculate_per_computer_hours
+from calculations import weekdays_elapsed, calculate_hours_bank, remaining_weekdays_in_week, calculate_stop_time
 
 
 def ev(computer, action, ts, is_work=True):
@@ -182,3 +183,126 @@ class TestCalculatePerComputerHours:
         result = calculate_per_computer_hours(events, NOW)
         assert result["ubuntu"]  == pytest.approx(4.0)
         assert result["windows"] == pytest.approx(4.0)
+
+
+class TestWeekdaysElapsed:
+    def test_full_work_week(self):
+        # Mon May 18 to Mon May 25 = 5 weekdays
+        assert weekdays_elapsed(date(2026, 5, 18), date(2026, 5, 25)) == 5
+
+    def test_includes_start_excludes_end(self):
+        assert weekdays_elapsed(date(2026, 5, 20), date(2026, 5, 21)) == 1
+
+    def test_weekend_not_counted(self):
+        # Sat to Mon = 0 (Sat and Sun are weekend)
+        assert weekdays_elapsed(date(2026, 5, 23), date(2026, 5, 25)) == 0
+
+    def test_same_date_returns_zero(self):
+        assert weekdays_elapsed(date(2026, 5, 20), date(2026, 5, 20)) == 0
+
+
+class TestHoursBank:
+    def test_on_track(self):
+        # 1 weekday elapsed, worked exactly 8h → bank = 0
+        tracking_start = date(2026, 5, 20)
+        now = datetime(2026, 5, 20, 17, 0)
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 17, 0)),
+        ]
+        assert calculate_hours_bank(events, [], tracking_start, 8.0, now) == pytest.approx(0.0)
+
+    def test_ahead(self):
+        tracking_start = date(2026, 5, 20)
+        now = datetime(2026, 5, 20, 18, 0)
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 18, 0)),
+        ]
+        # Worked 9h, expected 8h → +1h bank
+        assert calculate_hours_bank(events, [], tracking_start, 8.0, now) == pytest.approx(1.0)
+
+    def test_behind(self):
+        tracking_start = date(2026, 5, 20)
+        now = datetime(2026, 5, 20, 16, 0)
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 16, 0)),
+        ]
+        # Worked 7h, expected 8h → -1h bank
+        assert calculate_hours_bank(events, [], tracking_start, 8.0, now) == pytest.approx(-1.0)
+
+    def test_manual_entry_counts(self):
+        tracking_start = date(2026, 1, 1)
+        now = datetime(2026, 1, 1, 12, 0)
+        m = manual(date(2026, 1, 1), 8.0)
+        # 1 weekday elapsed (Jan 1 is a Thursday), worked 8h manual → bank = 0
+        assert calculate_hours_bank([], [m], tracking_start, 8.0, now) == pytest.approx(0.0)
+
+
+class TestRemainingWeekdays:
+    def test_monday(self):
+        assert remaining_weekdays_in_week(date(2026, 5, 18)) == 5
+
+    def test_wednesday(self):
+        assert remaining_weekdays_in_week(date(2026, 5, 20)) == 3
+
+    def test_friday(self):
+        assert remaining_weekdays_in_week(date(2026, 5, 22)) == 1
+
+
+class TestStopTime:
+    def test_done_for_day(self):
+        # Worked exactly 8h today, bank=0, Mon: all 5 days remain at 8h/day
+        now = datetime(2026, 5, 18, 17, 0)  # Monday 5pm
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 18, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 18, 17, 0)),
+        ]
+        result = calculate_stop_time(
+            week_events=events, week_manual=[],
+            today_events=events, today_manual=[],
+            bank_at_week_start=0.0, weekly_target=40.0, now=now,
+        )
+        assert result is None
+
+    def test_still_working(self):
+        # Monday 12pm, worked 3h so far, need 8h today → stop at 5pm
+        now = datetime(2026, 5, 18, 12, 0)
+        events = [ev("ubuntu", "login", datetime(2026, 5, 18, 9, 0))]
+        result = calculate_stop_time(
+            week_events=events, week_manual=[],
+            today_events=events, today_manual=[],
+            bank_at_week_start=0.0, weekly_target=40.0, now=now,
+        )
+        assert result == pytest.approx(
+            datetime(2026, 5, 18, 17, 0).timestamp(), abs=60
+        )
+
+    def test_banked_time_reduces_daily_target(self):
+        # +8h banked → adjusted target = 32h → need 32/5 = 6.4h/day on Monday
+        # Logged in at 9am, now = 15:24 (worked 6.4h) → should be done
+        now = datetime(2026, 5, 18, 15, 24)
+        events = [ev("ubuntu", "login", datetime(2026, 5, 18, 9, 0))]
+        result = calculate_stop_time(
+            week_events=events, week_manual=[],
+            today_events=events, today_manual=[],
+            bank_at_week_start=8.0, weekly_target=40.0, now=now,
+        )
+        assert result is None
+
+    def test_behind_increases_daily_target(self):
+        # -8h bank → adjusted target = 48h → need 48/5 = 9.6h/day on Monday
+        # Worked 8h today → not done yet
+        now = datetime(2026, 5, 18, 17, 0)
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 18, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 18, 17, 0)),
+        ]
+        result = calculate_stop_time(
+            week_events=events, week_manual=[],
+            today_events=events, today_manual=[],
+            bank_at_week_start=-8.0, weekly_target=40.0, now=now,
+        )
+        assert result is not None
+        assert result > now.timestamp()

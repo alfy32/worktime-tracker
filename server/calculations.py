@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 
 
 def get_sessions(events: list, now: datetime) -> list[tuple[datetime, datetime]]:
@@ -70,3 +70,74 @@ def calculate_per_computer_hours(events: list, now: datetime) -> dict[str, float
             (end - start).total_seconds() / 3600 for start, end in sessions
         )
     return result
+
+
+def weekdays_elapsed(start: date, end: date) -> int:
+    """Count Mon–Fri days from start up to but not including end."""
+    count = 0
+    current = start
+    while current < end:
+        if current.weekday() < 5:
+            count += 1
+        current += timedelta(days=1)
+    return count
+
+
+def calculate_hours_bank(
+    all_events: list,
+    all_manual: list,
+    tracking_start: date,
+    daily_target: float,
+    now: datetime,
+) -> float:
+    """
+    Running bank = total hours worked − weekdays elapsed × daily_target.
+    Positive = ahead of schedule, negative = behind.
+    Today counts as an elapsed weekday (end is exclusive, so pass tomorrow).
+    """
+    end = now.date() + timedelta(days=1)
+    expected = weekdays_elapsed(tracking_start, end) * daily_target
+    worked = calculate_work_hours(all_events, all_manual, now)
+    return worked - expected
+
+
+def remaining_weekdays_in_week(today: date) -> int:
+    """Count weekdays from today through Friday, inclusive."""
+    return sum(1 for d in range(today.weekday(), 5))
+
+
+def calculate_stop_time(
+    week_events: list,
+    week_manual: list,
+    today_events: list,
+    today_manual: list,
+    bank_at_week_start: float,
+    weekly_target: float,
+    now: datetime,
+) -> float | None:
+    """
+    Return the Unix timestamp today when the user can stop to stay on track for the week.
+    Returns None if today's required hours are already met.
+
+    adjusted_target = weekly_target - bank_at_week_start, clamped to [0, weekly_target * 1.5].
+    hours_needed_today = (adjusted_target - hours_worked_before_today) / remaining_weekdays.
+    """
+    today = now.date()
+
+    adjusted_target = weekly_target - bank_at_week_start
+    adjusted_target = max(0.0, min(adjusted_target, weekly_target * 1.5))
+
+    pre_today_events = [e for e in week_events if e.timestamp.date() < today]
+    pre_today_manual = [m for m in week_manual if m.date < today]
+    hours_before_today = calculate_work_hours(pre_today_events, pre_today_manual, now)
+
+    remaining_days = remaining_weekdays_in_week(today) or 1
+    hours_needed_today = (adjusted_target - hours_before_today) / remaining_days
+    hours_today = calculate_work_hours(today_events, today_manual, now)
+
+    remaining = hours_needed_today - hours_today
+    if remaining <= 0:
+        return None
+
+    stop_dt = now + timedelta(hours=remaining)
+    return stop_dt.timestamp()
