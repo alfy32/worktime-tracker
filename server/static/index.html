@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-slate-900 text-slate-200">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Work Time Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .page { display: none; }
+    .page.active { display: block; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate': {
+              750: '#293548',
+              850: '#172033',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen bg-slate-900">
+
+  <!-- Navigation -->
+  <nav class="bg-slate-800 border-b border-slate-700 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 flex items-center h-14 gap-1">
+      <span class="text-teal-400 font-bold mr-4 text-lg whitespace-nowrap">⏱ Work Time</span>
+      <button data-tab="dashboard" class="tab-btn px-4 py-2 text-sm rounded-lg font-medium transition-colors">Dashboard</button>
+      <button data-tab="daily"     class="tab-btn px-4 py-2 text-sm rounded-lg font-medium transition-colors">Daily</button>
+      <button data-tab="weekly"    class="tab-btn px-4 py-2 text-sm rounded-lg font-medium transition-colors">Weekly</button>
+      <button data-tab="log"       class="tab-btn px-4 py-2 text-sm rounded-lg font-medium transition-colors">Log</button>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <div id="page-dashboard" class="page max-w-5xl mx-auto px-4 py-6 space-y-5">
+    <!-- Hero card -->
+    <div class="bg-slate-800 rounded-2xl p-8 text-center">
+      <div id="hero-main" class="text-5xl font-bold mb-2 text-teal-400">--</div>
+      <div id="hero-sub"  class="text-slate-400 text-lg">Loading…</div>
+      <div id="hero-bank" class="text-slate-500 text-sm mt-2"></div>
+    </div>
+    <!-- Status + week card -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="bg-slate-800 rounded-xl p-5">
+        <div class="text-slate-500 text-xs uppercase tracking-wide mb-2">Status</div>
+        <div id="status-computer" class="text-base font-semibold"></div>
+        <div id="status-detail"   class="text-slate-400 text-sm mt-1"></div>
+        <div id="status-split"    class="text-slate-500 text-xs mt-2"></div>
+      </div>
+      <div class="bg-slate-800 rounded-xl p-5">
+        <div class="text-slate-500 text-xs uppercase tracking-wide mb-2">This Week</div>
+        <div id="week-hours"     class="text-3xl font-bold text-teal-400">--</div>
+        <div id="week-target"    class="text-slate-400 text-sm mt-1"></div>
+        <div id="week-remaining" class="text-slate-500 text-xs mt-1"></div>
+      </div>
+    </div>
+    <!-- Recent chart -->
+    <div class="bg-slate-800 rounded-xl p-6">
+      <div class="text-slate-500 text-xs uppercase tracking-wide mb-4">Last 10 Days</div>
+      <div style="height:180px"><canvas id="chart-recent"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Daily View -->
+  <div id="page-daily" class="page max-w-5xl mx-auto px-4 py-6 space-y-5">
+    <div class="bg-slate-800 rounded-xl p-6">
+      <div class="text-slate-500 text-xs uppercase tracking-wide mb-4">Daily Hours — Last 60 Days</div>
+      <div style="height:200px"><canvas id="chart-daily"></canvas></div>
+    </div>
+    <div class="bg-slate-800 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="text-slate-500 border-b border-slate-700 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="text-left p-4 w-8"></th>
+            <th class="text-left p-4">Date</th>
+            <th class="text-right p-4">Hours</th>
+            <th class="text-right p-4">Sessions</th>
+            <th class="text-right p-4">Longest Break</th>
+          </tr>
+        </thead>
+        <tbody id="daily-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Weekly View -->
+  <div id="page-weekly" class="page max-w-5xl mx-auto px-4 py-6 space-y-5">
+    <div class="bg-slate-800 rounded-xl p-6">
+      <div class="text-slate-500 text-xs uppercase tracking-wide mb-4">Weekly Hours — Last 26 Weeks</div>
+      <div style="height:200px"><canvas id="chart-weekly"></canvas></div>
+    </div>
+    <div class="bg-slate-800 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="text-slate-500 border-b border-slate-700 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="text-left p-4">Week of</th>
+            <th class="text-right p-4">Total Hours</th>
+            <th class="text-right p-4">Avg / Day</th>
+            <th class="text-right p-4">vs 40h</th>
+          </tr>
+        </thead>
+        <tbody id="weekly-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div id="page-log" class="page max-w-5xl mx-auto px-4 py-6 space-y-4">
+    <div class="flex items-center gap-3 flex-wrap">
+      <select id="log-filter-computer" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300">
+        <option value="">All computers</option>
+        <option value="ubuntu">ubuntu</option>
+        <option value="windows">windows</option>
+      </select>
+      <button id="btn-add-manual" class="ml-auto bg-teal-700 hover:bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+        + Add Manual Entry
+      </button>
+    </div>
+    <div class="bg-slate-800 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="text-slate-500 border-b border-slate-700 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="text-left p-4">Login</th>
+            <th class="text-left p-4">Computer</th>
+            <th class="text-right p-4">Duration</th>
+            <th class="text-center p-4">Work?</th>
+            <th class="text-left p-4 hidden sm:table-cell">Note</th>
+          </tr>
+        </thead>
+        <tbody id="log-table-body"></tbody>
+      </table>
+      <div id="log-pagination" class="flex items-center justify-center gap-4 p-4 border-t border-slate-700 text-sm"></div>
+    </div>
+    <div class="bg-slate-800 rounded-xl p-5">
+      <div class="text-slate-500 text-xs uppercase tracking-wide mb-3">Manual Entries</div>
+      <div id="manual-list"></div>
+    </div>
+  </div>
+
+  <!-- Manual Entry Modal -->
+  <div id="modal-manual" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50" style="display:none">
+    <div class="bg-slate-800 rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
+      <h3 class="text-base font-semibold mb-4">Add Manual Entry</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="text-slate-400 text-xs block mb-1">Date</label>
+          <input id="manual-date" type="date" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200">
+        </div>
+        <div>
+          <label class="text-slate-400 text-xs block mb-1">Hours</label>
+          <input id="manual-hours" type="number" value="8" min="0.5" max="24" step="0.5"
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200">
+        </div>
+        <div>
+          <label class="text-slate-400 text-xs block mb-1">Note (optional)</label>
+          <input id="manual-note" type="text" placeholder="e.g. New Years Day"
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500">
+        </div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button id="btn-modal-cancel" class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 text-sm transition-colors">Cancel</button>
+        <button id="btn-modal-save"   class="flex-1 bg-teal-700 hover:bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts (order matters: api → charts → pages → app last) -->
+  <script src="js/api.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/daily.js"></script>
+  <script src="js/weekly.js"></script>
+  <script src="js/log.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
