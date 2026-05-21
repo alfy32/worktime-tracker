@@ -151,3 +151,51 @@ class TestLoadConfig:
              mock.patch('socket.gethostname', return_value='testhost'):
             _, name = load_config()
         assert name == 'testhost'
+
+
+class TestParseEventsStructured:
+    """Tests for new systemd journal format using structured fields."""
+
+    def _entry(self, ts_offset_seconds, message, code_func='', session_id='', user_id=''):
+        d = {
+            '__REALTIME_TIMESTAMP': str(BASE + ts_offset_seconds * 1_000_000),
+            'MESSAGE': message,
+        }
+        if code_func:
+            d['CODE_FUNC'] = code_func
+        if session_id:
+            d['SESSION_ID'] = session_id
+        if user_id:
+            d['USER_ID'] = user_id
+        return json.dumps(d)
+
+    def test_structured_login(self):
+        lines = [self._entry(0, 'New session 2 of user alan.', 'session_start', '2', 'alan')]
+        events = parse_events(lines, username='alan')
+        assert len(events) == 1
+        assert events[0]['action'] == 'login'
+
+    def test_system_user_excluded(self):
+        lines = [self._entry(0, 'New session c1 of user gdm.', 'session_start', 'c1', 'gdm')]
+        events = parse_events(lines, username='alan')
+        assert events == []
+
+    def test_duplicate_logout_deduplicated(self):
+        lines = [
+            self._entry(0,    'New session 2 of user alan.',                                'session_start',     '2', 'alan'),
+            self._entry(3600, 'Session 2 logged out. Waiting for processes to exit.',       'session_stop_scope','2', 'alan'),
+            self._entry(3601, 'Removed session 2.',                                         'session_finalize',  '2', 'alan'),
+        ]
+        events = parse_events(lines, username='alan')
+        assert [e['action'] for e in events] == ['login', 'logout']
+
+    def test_structured_full_cycle(self):
+        lines = [
+            self._entry(0,    'New session 2 of user alan.',                                'session_start',     '2', 'alan'),
+            self._entry(1,    'Session 2 logged out. Waiting for processes to exit.',       'session_stop_scope','2', 'alan'),
+            self._entry(2,    'Removed session 2.',                                         'session_finalize',  '2', 'alan'),
+        ]
+        events = parse_events(lines, username='alan')
+        assert len(events) == 2
+        assert events[0]['action'] == 'login'
+        assert events[1]['action'] == 'logout'

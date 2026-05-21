@@ -17,20 +17,34 @@ _UNLOCKED    = re.compile(r'^Session (\S+) unlocked\.')
 _LOGGED_OUT  = re.compile(r'^Session (\S+) logged out\.')
 _REMOVED     = re.compile(r'^Removed session (\S+)\.')
 
+_SYSTEM_USERS = frozenset({'gdm', 'lightdm', 'sddm', 'sddm-helper', 'xdm'})
 
-def parse_events(lines):
+
+def parse_events(lines, username=None):
     """Parse journalctl JSON lines into a list of event dicts.
+
+    Supports both new systemd (CODE_FUNC + SESSION_ID + USER_ID structured fields)
+    and old systemd (MESSAGE text with 'on seat seat0' pattern).
 
     Args:
         lines: iterable of JSON strings from: journalctl -u systemd-logind --output json
+        username: only track sessions for this user. If None, auto-detected via pwd.
 
     Returns:
         List of {'timestamp': 'YYYY-MM-DDTHH:MM:SS', 'action': 'login'|'logout'},
         sorted by timestamp ascending.
     """
-    # First pass: identify all graphical sessions
-    graphical_sessions = set()
+    if username is None:
+        try:
+            import pwd
+            username = pwd.getpwuid(os.getuid()).pw_name
+        except Exception:
+            username = os.environ.get('USER') or os.environ.get('LOGNAME') or ''
+
+    # Pre-scan: collect graphical session IDs from old-style _NEW_SESSION regex
+    # so that out-of-order lock/unlock/logout events can still match.
     parsed_entries = []
+    graphical_sessions = set()
 
     for line in lines:
         line = line.strip()
@@ -46,34 +60,76 @@ def parse_events(lines):
             continue
 
         msg = entry.get('MESSAGE', '')
+        if not isinstance(msg, str):
+            continue
 
-        m = _NEW_SESSION.match(msg)
-        if m:
-            graphical_sessions.add(m.group(1))
+        code_func = entry.get('CODE_FUNC', '')
+        session_id = entry.get('SESSION_ID', '')
+        user_id = entry.get('USER_ID', '')
 
-        parsed_entries.append((ts_us, msg))
+        # For the regex path: pre-collect sessions from _NEW_SESSION (no CODE_FUNC)
+        if not code_func and not session_id:
+            m = _NEW_SESSION.match(msg)
+            if m:
+                graphical_sessions.add(m.group(1))
 
-    # Second pass: generate events based on identified sessions
+        parsed_entries.append((ts_us, msg, code_func, session_id, user_id))
+
+    # Main pass: emit events
+    structured_sessions = set()   # sessions opened via structured fields
+    logged_out_sessions = set()
     events = []
-    for ts_us, msg in parsed_entries:
+
+    for ts_us, msg, code_func, session_id, user_id in parsed_entries:
         dt = datetime.fromtimestamp(int(ts_us) / 1_000_000)
         iso = dt.strftime('%Y-%m-%dT%H:%M:%S')
 
-        m = _NEW_SESSION.match(msg)
-        if m:
+        # ── Structured-field path (new systemd) ───────────────────────
+        if code_func == 'session_start' and session_id and user_id:
+            if username:
+                track = (user_id == username)
+            else:
+                track = (user_id not in _SYSTEM_USERS)
+            if track:
+                structured_sessions.add(session_id)
+                graphical_sessions.add(session_id)
+                events.append({'timestamp': iso, 'action': 'login'})
+            continue
+
+        if code_func in ('session_stop_scope', 'session_finalize') and session_id:
+            if session_id in structured_sessions and session_id not in logged_out_sessions:
+                logged_out_sessions.add(session_id)
+                events.append({'timestamp': iso, 'action': 'logout'})
+            continue
+
+        # ── Regex-based path (old systemd or lock/unlock events) ──────
+        if not session_id:
+            m = _NEW_SESSION.match(msg)
+            if m:
+                events.append({'timestamp': iso, 'action': 'login'})
+                continue
+
+        m = _LOCKED.match(msg)
+        if m and m.group(1) in graphical_sessions:
+            events.append({'timestamp': iso, 'action': 'logout'})
+            continue
+
+        m = _UNLOCKED.match(msg)
+        if m and m.group(1) in graphical_sessions:
             events.append({'timestamp': iso, 'action': 'login'})
             continue
 
-        for pattern, action in (
-            (_LOCKED,     'logout'),
-            (_UNLOCKED,   'login'),
-            (_LOGGED_OUT, 'logout'),
-            (_REMOVED,    'logout'),
-        ):
-            m = pattern.match(msg)
-            if m and m.group(1) in graphical_sessions:
-                events.append({'timestamp': iso, 'action': action})
-                break
+        if not session_id:
+            m = _LOGGED_OUT.match(msg)
+            if m and m.group(1) in graphical_sessions and m.group(1) not in logged_out_sessions:
+                logged_out_sessions.add(m.group(1))
+                events.append({'timestamp': iso, 'action': 'logout'})
+                continue
+            m = _REMOVED.match(msg)
+            if m and m.group(1) in graphical_sessions and m.group(1) not in logged_out_sessions:
+                logged_out_sessions.add(m.group(1))
+                events.append({'timestamp': iso, 'action': 'logout'})
+                continue
 
     return sorted(events, key=lambda e: e['timestamp'])
 
