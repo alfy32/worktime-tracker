@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from database import engine, Base, SessionLocal
 from models import Settings
-from routers import sync, summary, sessions
+from routers import sync, summary, sessions, manual
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -30,4 +30,5 @@ app = FastAPI(title="Work Time Tracker", lifespan=lifespan)
 app.include_router(sync.router)
 app.include_router(summary.router)
 app.include_router(sessions.router)
+app.include_router(manual.router)
 app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
