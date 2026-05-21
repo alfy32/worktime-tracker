@@ -101,6 +101,7 @@ The server upserts on `(computer, timestamp, action)` — re-syncing is always s
 | timestamp | datetime | |
 | action | text | "login" or "logout" |
 | is_work | boolean | default true |
+| note | text | nullable — reason for marking non-work (e.g., "watching a show", "personal errand") |
 
 **`manual_entries` table**
 

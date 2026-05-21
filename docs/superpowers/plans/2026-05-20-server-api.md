@@ -163,6 +163,7 @@ class Event(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     action: Mapped[str] = mapped_column(String, nullable=False)
     is_work: Mapped[bool] = mapped_column(Boolean, default=True)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class ManualEntry(Base):
@@ -286,6 +287,7 @@ class SessionOut(BaseModel):
     duration_hours: float
     is_work: bool
     is_active: bool
+    note: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -352,6 +354,7 @@ class SessionsResponse(BaseModel):
 
 class PatchSession(BaseModel):
     is_work: bool
+    note: str | None = None
 
 
 class ManualEntryIn(BaseModel):
@@ -983,6 +986,7 @@ def build_sessions(events: list, now: datetime) -> list[SessionOut]:
                     login_at=pending, logout_at=ev.timestamp,
                     duration_hours=round(dur, 2),
                     is_work=pending_ev.is_work, is_active=False,
+                    note=pending_ev.note,
                 ))
                 pending = None
         if pending is not None and pending_ev is not None:
@@ -992,6 +996,7 @@ def build_sessions(events: list, now: datetime) -> list[SessionOut]:
                 login_at=pending, logout_at=None,
                 duration_hours=round(dur, 2),
                 is_work=pending_ev.is_work, is_active=True,
+                note=pending_ev.note,
             ))
     return sorted(result, key=lambda s: s.login_at)
 ```
@@ -1678,6 +1683,19 @@ def test_patch_session_toggles_is_work(client):
     assert resp.json()["is_work"] is False
 
 
+@freeze_time("2026-05-20 17:00:00")
+def test_patch_session_saves_note(client):
+    seed(client, "ubuntu", [
+        {"timestamp": "2026-05-20T08:00:00", "action": "login"},
+        {"timestamp": "2026-05-20T12:00:00", "action": "logout"},
+    ])
+    session_id = client.get("/api/sessions").json()["sessions"][0]["id"]
+    resp = client.patch(f"/api/sessions/{session_id}", json={"is_work": False, "note": "watching a show"})
+    assert resp.status_code == 200
+    assert resp.json()["note"] == "watching a show"
+    assert resp.json()["is_work"] is False
+
+
 def test_patch_nonexistent_session_returns_404(client):
     resp = client.patch("/api/sessions/9999", json={"is_work": False})
     assert resp.status_code == 404
@@ -1754,6 +1772,7 @@ def patch_session(
         raise HTTPException(status_code=404, detail="Session not found")
 
     event.is_work = body.is_work
+    event.note = body.note
     db.commit()
 
     all_events = db.query(Event).filter(Event.computer == event.computer).all()
