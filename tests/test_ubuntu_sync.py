@@ -1,11 +1,10 @@
-import importlib
 import json
 import os
 import sys
 import unittest.mock as mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'agents', 'ubuntu'))
-from sync import parse_events
+from sync import parse_events, load_config
 
 BASE = 1_747_742_405_000_000  # arbitrary base timestamp, microseconds since epoch
 
@@ -121,7 +120,6 @@ class TestLoadConfig:
             'WORKTIME_SERVER_URL': 'http://192.168.1.10:8000',
             'WORKTIME_COMPUTER_NAME': 'mydesktop',
         }):
-            from sync import load_config
             url, name = load_config()
         assert url == 'http://192.168.1.10:8000'
         assert name == 'mydesktop'
@@ -131,20 +129,19 @@ class TestLoadConfig:
             'WORKTIME_SERVER_URL': 'http://192.168.1.10:8000/',
             'WORKTIME_COMPUTER_NAME': 'mydesktop',
         }):
-            from sync import load_config
             url, _ = load_config()
         assert url == 'http://192.168.1.10:8000'
 
     def test_missing_url_exits(self):
         env = {k: v for k, v in os.environ.items()
                if k not in ('WORKTIME_SERVER_URL', 'WORKTIME_COMPUTER_NAME')}
-        # Ensure no config file is found by patching expanduser
+        # Ensure no config file is found by patching os.path.exists
         with mock.patch.dict(os.environ, env, clear=True), \
              mock.patch('os.path.exists', return_value=False):
             import pytest
-            from sync import load_config
-            with pytest.raises(SystemExit):
+            with pytest.raises(SystemExit) as exc_info:
                 load_config()
+        assert exc_info.value.code == 1
 
     def test_hostname_used_when_name_not_set(self):
         env_copy = {k: v for k, v in os.environ.items() if k != 'WORKTIME_COMPUTER_NAME'}
@@ -152,6 +149,5 @@ class TestLoadConfig:
         with mock.patch.dict(os.environ, env_copy, clear=True), \
              mock.patch('os.path.exists', return_value=False), \
              mock.patch('socket.gethostname', return_value='testhost'):
-            from sync import load_config
             _, name = load_config()
         assert name == 'testhost'
