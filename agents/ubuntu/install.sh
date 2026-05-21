@@ -32,6 +32,16 @@ fi
 read -rp "Computer name [$default_name]: " input_name
 COMPUTER_NAME="${input_name:-$default_name}"
 
+if [[ -z "$SERVER_URL" ]]; then
+  echo "Error: Server URL cannot be empty." >&2
+  exit 1
+fi
+
+if [[ "$COMPUTER_NAME" == *" "* ]]; then
+  echo "Error: Computer name cannot contain spaces." >&2
+  exit 1
+fi
+
 # ── Write config ─────────────────────────────────────────────────
 mkdir -p "$CONFIG_DIR"
 cat > "$CONFIG_FILE" <<EOF
@@ -39,6 +49,7 @@ WORKTIME_SERVER_URL=$SERVER_URL
 WORKTIME_COMPUTER_NAME=$COMPUTER_NAME
 EOF
 echo "Wrote $CONFIG_FILE"
+chmod 600 "$CONFIG_FILE"
 
 # ── Write systemd units ──────────────────────────────────────────
 mkdir -p "$SYSTEMD_DIR"
@@ -51,7 +62,7 @@ After=network.target
 [Service]
 Type=oneshot
 EnvironmentFile=%h/.config/worktime-tracker/config
-ExecStart=/usr/bin/python3 $SYNC_PY
+ExecStart=/usr/bin/python3 "$SYNC_PY"
 StandardOutput=journal
 StandardError=journal
 EOF
