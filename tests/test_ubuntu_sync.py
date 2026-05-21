@@ -77,6 +77,7 @@ class TestParseEvents:
         events = parse_events(lines)
         assert events[0]['action'] == 'login'
         assert events[1]['action'] == 'logout'
+        assert events[0]['timestamp'] < events[1]['timestamp']
 
     def test_timestamp_iso_format(self):
         lines = [entry(0, 'New session c1 of user alan on seat seat0.')]

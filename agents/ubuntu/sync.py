@@ -112,6 +112,9 @@ def fetch_journal_lines(since='30 days ago'):
          '--output', 'json', '--since', since, '--no-pager'],
         capture_output=True, text=True,
     )
+    if result.returncode != 0:
+        print(f'journalctl failed: {result.stderr.strip()}', file=sys.stderr)
+        sys.exit(1)
     return result.stdout.splitlines()
 
 
