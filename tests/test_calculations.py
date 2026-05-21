@@ -304,3 +304,11 @@ class TestStopTime:
         )
         assert result is not None
         assert result > now
+
+    def test_weekend_returns_none(self):
+        now = datetime(2026, 5, 23, 12, 0)  # Saturday
+        assert calculate_stop_time(
+            week_events=[], week_manual=[],
+            today_events=[], today_manual=[],
+            bank_at_week_start=0.0, weekly_target=40.0, now=now,
+        ) is None

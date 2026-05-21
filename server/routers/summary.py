@@ -11,7 +11,7 @@ from schemas import (
 from calculations import (
     calculate_work_hours, calculate_per_computer_hours,
     calculate_hours_bank, calculate_stop_time,
-    get_sessions, remaining_weekdays_in_week, weekdays_elapsed,
+    get_sessions, merge_intervals, remaining_weekdays_in_week, weekdays_elapsed,
 )
 from session_utils import build_sessions
 
@@ -81,11 +81,26 @@ def summary_today(db: Session = Depends(get_db)):
     )
     hours_remaining = round((stop_time - now).total_seconds() / 3600, 2) if stop_time else 0.0
 
-    latest = max(all_events, key=lambda e: e.timestamp, default=None)
+    # Report logged_in=True if any computer's most recent event is a login
+    computers = {e.computer for e in all_events}
+    status_computer: str | None = None
+    status_since: datetime | None = None
+    status_logged_in = False
+    for comp in computers:
+        last = max((e for e in all_events if e.computer == comp), key=lambda e: e.timestamp)
+        if last.action == "login":
+            if not status_logged_in or last.timestamp > (status_since or last.timestamp):
+                status_computer = comp
+                status_since = last.timestamp
+                status_logged_in = True
+        elif not status_logged_in:
+            if status_since is None or last.timestamp > status_since:
+                status_computer = comp
+                status_since = last.timestamp
     status = ComputerStatus(
-        computer=latest.computer if latest else None,
-        logged_in=(latest.action == "login") if latest else False,
-        since=latest.timestamp if latest else None,
+        computer=status_computer,
+        logged_in=status_logged_in,
+        since=status_since,
     )
 
     return TodaySummary(
@@ -147,17 +162,17 @@ def summary_week(db: Session = Depends(get_db)):
 
 
 def _longest_break(events: list, now: datetime) -> float:
-    """Find the longest gap between sessions for a single day's events."""
+    """Find the longest gap between merged sessions for a single day's events."""
     all_sessions = []
     for computer in {e.computer for e in events}:
         comp_events = [e for e in events if e.computer == computer]
         all_sessions.extend(get_sessions(comp_events, now))
-    if len(all_sessions) < 2:
+    merged = merge_intervals(all_sessions)
+    if len(merged) < 2:
         return 0.0
-    sorted_sessions = sorted(all_sessions, key=lambda s: s[0])
     max_gap = 0.0
-    for i in range(1, len(sorted_sessions)):
-        gap = (sorted_sessions[i][0] - sorted_sessions[i - 1][1]).total_seconds() / 3600
+    for i in range(1, len(merged)):
+        gap = (merged[i][0] - merged[i - 1][1]).total_seconds() / 3600
         max_gap = max(max_gap, gap)
     return round(max_gap, 2)
 

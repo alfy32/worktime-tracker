@@ -124,6 +124,9 @@ def calculate_stop_time(
     """
     today = now.date()
 
+    if today.weekday() >= 5:
+        return None
+
     adjusted_target = weekly_target - bank_at_week_start
     adjusted_target = max(0.0, min(adjusted_target, weekly_target * 1.5))
 

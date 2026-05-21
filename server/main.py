@@ -13,16 +13,18 @@ _STATIC_DIR = Path(__file__).parent / "static"
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    defaults = {
-        "weekly_target_hours": "40",
-        "daily_target_hours":  "8",
-        "tracking_start_date": "2026-01-01",
-    }
-    for key, value in defaults.items():
-        if not db.query(Settings).filter(Settings.key == key).first():
-            db.add(Settings(key=key, value=value))
-    db.commit()
-    db.close()
+    try:
+        defaults = {
+            "weekly_target_hours": "40",
+            "daily_target_hours":  "8",
+            "tracking_start_date": "2026-01-01",
+        }
+        for key, value in defaults.items():
+            if not db.query(Settings).filter(Settings.key == key).first():
+                db.add(Settings(key=key, value=value))
+        db.commit()
+    finally:
+        db.close()
     yield
 
 
