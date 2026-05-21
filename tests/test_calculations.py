@@ -275,9 +275,7 @@ class TestStopTime:
             today_events=events, today_manual=[],
             bank_at_week_start=0.0, weekly_target=40.0, now=now,
         )
-        assert result == pytest.approx(
-            datetime(2026, 5, 18, 17, 0).timestamp(), abs=60
-        )
+        assert abs((result - datetime(2026, 5, 18, 17, 0)).total_seconds()) < 60
 
     def test_banked_time_reduces_daily_target(self):
         # +8h banked → adjusted target = 32h → need 32/5 = 6.4h/day on Monday
@@ -305,4 +303,4 @@ class TestStopTime:
             bank_at_week_start=-8.0, weekly_target=40.0, now=now,
         )
         assert result is not None
-        assert result > now.timestamp()
+        assert result > now

@@ -114,9 +114,9 @@ def calculate_stop_time(
     bank_at_week_start: float,
     weekly_target: float,
     now: datetime,
-) -> float | None:
+) -> datetime | None:
     """
-    Return the Unix timestamp today when the user can stop to stay on track for the week.
+    Return the datetime today when the user can stop to stay on track for the week.
     Returns None if today's required hours are already met.
 
     adjusted_target = weekly_target - bank_at_week_start, clamped to [0, weekly_target * 1.5].
@@ -139,5 +139,4 @@ def calculate_stop_time(
     if remaining <= 0:
         return None
 
-    stop_dt = now + timedelta(hours=remaining)
-    return stop_dt.timestamp()
+    return now + timedelta(hours=remaining)
