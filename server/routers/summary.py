@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Event, ManualEntry, Settings
 from schemas import (
-    TodaySummary, WeekSummary,
-    SessionOut, ComputerStatus, DayBreakdown,
+    TodaySummary, WeekSummary, DailySummary, WeeklySummary,
+    SessionOut, ComputerStatus, DayBreakdown, DayStats, WeekStats,
 )
 from calculations import (
     calculate_work_hours, calculate_per_computer_hours,
@@ -144,3 +144,75 @@ def summary_week(db: Session = Depends(get_db)):
         remaining_weekdays=remaining_weekdays,
         daily_breakdown=breakdown,
     )
+
+
+def _longest_break(events: list, now: datetime) -> float:
+    """Find the longest gap between sessions for a single day's events."""
+    all_sessions = []
+    for computer in {e.computer for e in events}:
+        comp_events = [e for e in events if e.computer == computer]
+        all_sessions.extend(get_sessions(comp_events, now))
+    if len(all_sessions) < 2:
+        return 0.0
+    sorted_sessions = sorted(all_sessions, key=lambda s: s[0])
+    max_gap = 0.0
+    for i in range(1, len(sorted_sessions)):
+        gap = (sorted_sessions[i][0] - sorted_sessions[i - 1][1]).total_seconds() / 3600
+        max_gap = max(max_gap, gap)
+    return round(max_gap, 2)
+
+
+@router.get("/api/summary/daily", response_model=DailySummary)
+def summary_daily(days: int = 60, db: Session = Depends(get_db)):
+    now   = datetime.now()
+    today = now.date()
+    result = []
+    for i in range(days - 1, -1, -1):
+        d = today - timedelta(days=i)
+        d_events = _day_events(db, d)
+        d_manual = _day_manual(db, d)
+        end_of_day = datetime.combine(d + timedelta(days=1), datetime.min.time())
+        cutoff = now if d == today else end_of_day
+        hours = calculate_work_hours(d_events, d_manual, cutoff)
+        sessions_count = sum(
+            len(get_sessions([e for e in d_events if e.computer == c], cutoff))
+            for c in {e.computer for e in d_events}
+        )
+        result.append(DayStats(
+            date=d,
+            hours=round(hours, 2),
+            session_count=sessions_count,
+            longest_break_hours=_longest_break(d_events, cutoff),
+        ))
+    return DailySummary(days=result)
+
+
+@router.get("/api/summary/weekly", response_model=WeeklySummary)
+def summary_weekly(weeks: int = 26, db: Session = Depends(get_db)):
+    now        = datetime.now()
+    today      = now.date()
+    week_start = today - timedelta(days=today.weekday())
+    result     = []
+    for i in range(weeks - 1, -1, -1):
+        ws = week_start - timedelta(weeks=i)
+        we = ws + timedelta(days=6)
+        w_events = db.query(Event).filter(
+            Event.timestamp >= datetime.combine(ws, datetime.min.time()),
+            Event.timestamp <  datetime.combine(we + timedelta(days=1), datetime.min.time()),
+        ).all()
+        w_manual = db.query(ManualEntry).filter(
+            ManualEntry.date >= ws,
+            ManualEntry.date <= min(we, today),
+        ).all()
+        end_of_week = datetime.combine(we + timedelta(days=1), datetime.min.time())
+        cap = now if we >= today else end_of_week
+        total = calculate_work_hours(w_events, w_manual, cap)
+        worked_days = weekdays_elapsed(ws, min(we + timedelta(days=1), today + timedelta(days=1)))
+        avg = round(total / worked_days, 2) if worked_days else 0.0
+        result.append(WeekStats(
+            week_start=ws,
+            total_hours=round(total, 2),
+            avg_hours_per_day=avg,
+            delta_from_40=round(total - 40.0, 2),
+        ))
+    return WeeklySummary(weeks=result)

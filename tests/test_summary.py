@@ -70,3 +70,45 @@ def test_week_summary(client):
     data = resp.json()
     assert data["total_hours"] == pytest.approx(16.0)
     assert len(data["daily_breakdown"]) >= 2
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_daily_summary_returns_requested_days(client):
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-18T09:00:00", "action": "login"},
+        {"timestamp": "2026-05-18T17:00:00", "action": "logout"},
+    ])
+    resp = client.get("/api/summary/daily?days=5")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["days"]) == 5
+    may18 = next(d for d in data["days"] if d["date"] == "2026-05-18")
+    assert may18["hours"] == pytest.approx(8.0)
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_daily_summary_longest_break(client):
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-18T08:00:00", "action": "login"},
+        {"timestamp": "2026-05-18T12:00:00", "action": "logout"},
+        {"timestamp": "2026-05-18T13:30:00", "action": "login"},
+        {"timestamp": "2026-05-18T17:00:00", "action": "logout"},
+    ])
+    resp = client.get("/api/summary/daily?days=5")
+    may18 = next(d for d in resp.json()["days"] if d["date"] == "2026-05-18")
+    assert may18["longest_break_hours"] == pytest.approx(1.5)
+    assert may18["session_count"] == 2
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_weekly_summary(client):
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-18T09:00:00", "action": "login"},
+        {"timestamp": "2026-05-18T17:00:00", "action": "logout"},
+    ])
+    resp = client.get("/api/summary/weekly?weeks=4")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["weeks"]) == 4
+    current_week = data["weeks"][-1]
+    assert current_week["total_hours"] == pytest.approx(8.0)
