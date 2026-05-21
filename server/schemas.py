@@ -1,10 +1,11 @@
 from datetime import datetime, date
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, Field
 
 
 class SyncEvent(BaseModel):
     timestamp: datetime
-    action: str
+    action: Literal["login", "logout"]
 
 
 class SyncRequest(BaseModel):
@@ -97,7 +98,7 @@ class PatchSession(BaseModel):
 
 class ManualEntryIn(BaseModel):
     date: date
-    hours: float = 8.0
+    hours: float = Field(8.0, gt=0, le=24)
     note: str | None = None
 
 
