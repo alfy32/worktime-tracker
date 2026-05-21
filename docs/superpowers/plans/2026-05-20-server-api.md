@@ -96,13 +96,24 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - worktime_data:/app/data
+      - ./data:/app/data   # host path — adjust on the home server to wherever you want the file
     environment:
       - DATABASE_URL=sqlite:////app/data/worktime.db
     restart: unless-stopped
+```
 
-volumes:
-  worktime_data:
+The `./data/` directory must exist on the host before starting the container:
+
+```bash
+mkdir -p data
+```
+
+`worktime.db` will then live at `<wherever you cloned this>/data/worktime.db` on the home server — a plain file you can copy, open in any SQLite viewer, or back up with a cron job:
+
+```bash
+# example: daily backup at 2am
+0 2 * * * cp /path/to/worktime-tracker/data/worktime.db \
+  /path/to/worktime-tracker/data/backups/worktime-$(date +\%Y-\%m-\%d).db
 ```
 
 - [ ] **Step 6: Commit**

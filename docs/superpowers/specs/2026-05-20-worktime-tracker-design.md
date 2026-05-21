@@ -231,6 +231,8 @@ The existing Google Sheet has data going back to 1/1/2026. Import will be handle
 
 The Docker container exposes port 8000. On the home network, access at `http://homeserver:8000`. For remote access, install Tailscale on the home server.
 
+SQLite data is stored via a bind mount (`./data/worktime.db`) so the database file lives at a known path on the host — not buried in a Docker volume. Back up with a simple cron job that copies the file daily. The path in `docker-compose.yml` should be adjusted to wherever the repo lives on the home server.
+
 ---
 
 ## Out of Scope
