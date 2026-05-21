@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 
 
 def get_sessions(events: list, now: datetime) -> list[tuple[datetime, datetime]]:

@@ -68,6 +68,28 @@ class TestGetSessions:
             (datetime(2026, 5, 20, 8, 0), datetime(2026, 5, 20, 12, 0))
         ]
 
+    def test_orphaned_logout_ignored(self):
+        events = [
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 7, 0)),
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 8, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 12, 0)),
+        ]
+        assert get_sessions(events, NOW) == [
+            (datetime(2026, 5, 20, 8, 0), datetime(2026, 5, 20, 12, 0))
+        ]
+
+    def test_double_login_uses_second(self):
+        # If two logins arrive without a logout (e.g. missed crash logout),
+        # the second login starts the session (first is lost — expected behavior).
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 8, 0)),
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 12, 0)),
+        ]
+        assert get_sessions(events, NOW) == [
+            (datetime(2026, 5, 20, 9, 0), datetime(2026, 5, 20, 12, 0))
+        ]
+
 
 class TestMergeIntervals:
     def test_empty(self):
@@ -103,8 +125,10 @@ class TestMergeIntervals:
             (datetime(2026, 5, 20, 13, 0), datetime(2026, 5, 20, 17, 0)),
             (datetime(2026, 5, 20, 8, 0),  datetime(2026, 5, 20, 12, 0)),
         ]
-        result = merge_intervals(ivs)
-        assert result[0][0] == datetime(2026, 5, 20, 8, 0)
+        assert merge_intervals(ivs) == [
+            (datetime(2026, 5, 20, 8, 0),  datetime(2026, 5, 20, 12, 0)),
+            (datetime(2026, 5, 20, 13, 0), datetime(2026, 5, 20, 17, 0)),
+        ]
 
 
 class TestCalculateWorkHours:
