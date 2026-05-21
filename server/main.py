@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from database import engine, Base, SessionLocal
 from models import Settings
-from routers import sync
+from routers import sync, summary
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -28,4 +28,5 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Work Time Tracker", lifespan=lifespan)
 app.include_router(sync.router)
+app.include_router(summary.router)
 app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
