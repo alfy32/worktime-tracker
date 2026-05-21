@@ -94,6 +94,7 @@ def parse_events(lines, username=None):
             if track:
                 structured_sessions.add(session_id)
                 graphical_sessions.add(session_id)
+                logged_out_sessions.discard(session_id)  # session ID reused across reboots
                 events.append({'timestamp': iso, 'action': 'login'})
             continue
 
