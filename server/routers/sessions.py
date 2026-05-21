@@ -10,6 +10,12 @@ from session_utils import build_sessions
 router = APIRouter()
 
 
+@router.get("/api/sessions/computers", response_model=list[str])
+def list_computers(db: Session = Depends(get_db)):
+    rows = db.query(Event.computer).distinct().all()
+    return sorted(r.computer for r in rows)
+
+
 @router.get("/api/sessions", response_model=SessionsResponse)
 def list_sessions(
     page: int = 1,

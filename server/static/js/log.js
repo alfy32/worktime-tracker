@@ -15,10 +15,23 @@ const Log = (() => {
 
   async function load() {
     _page = 1;
+    await populateComputerFilter();
     bindFilter();
     bindModal();
     await loadSessions();
     await loadManual();
+  }
+
+  async function populateComputerFilter() {
+    try {
+      const computers = await api.getComputers();
+      const sel = document.getElementById('log-filter-computer');
+      const current = sel.value;
+      sel.innerHTML = '<option value="">All computers</option>' +
+        computers.map(c => '<option value="' + c + '"' + (c === current ? ' selected' : '') + '>' + c + '</option>').join('');
+    } catch (e) {
+      console.error('Could not load computer list:', e);
+    }
   }
 
   // ── Sessions ────────────────────────────────────────────────────
