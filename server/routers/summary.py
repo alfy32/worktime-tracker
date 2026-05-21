@@ -127,7 +127,9 @@ def summary_week(db: Session = Depends(get_db)):
             break
         d_events = _day_events(db, d)
         d_manual = _day_manual(db, d)
-        hours = calculate_work_hours(d_events, d_manual, now)
+        end_of_day = datetime.combine(d + timedelta(days=1), datetime.min.time())
+        cutoff = now if d == today else end_of_day
+        hours = calculate_work_hours(d_events, d_manual, cutoff)
         total_hours += hours
         breakdown.append(DayBreakdown(date=d, hours=round(hours, 2), is_today=(d == today)))
 
