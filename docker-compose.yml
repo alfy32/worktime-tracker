@@ -1,0 +1,10 @@
+services:
+  server:
+    build: ./server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data   # host path — adjust on the home server to wherever you want the file
+    environment:
+      - DATABASE_URL=sqlite:////app/data/worktime.db
+    restart: unless-stopped
