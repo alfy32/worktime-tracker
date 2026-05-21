@@ -3,6 +3,7 @@ const Log = (() => {
   let _page = 1;
   let _filterComputer = '';
   let _filterBound = false;
+  let _modalBound = false;
 
   function fmtH(h) { return Charts.fmtH(h); }
 
@@ -24,9 +25,21 @@ const Log = (() => {
 
   async function loadSessions() {
     try {
-      const data = await api.getSessions(_page, PER_PAGE);
-      renderSessions(data);
-      renderPagination(data);
+      const perPage = _filterComputer ? 5000 : PER_PAGE;
+      const page = _filterComputer ? 1 : _page;
+      const data = await api.getSessions(page, perPage);
+      if (_filterComputer) {
+        // Filter client-side, paginate the filtered result
+        const filtered = data.sessions.filter(s => s.computer === _filterComputer);
+        const total = filtered.length;
+        const start = (_page - 1) * PER_PAGE;
+        const paged = filtered.slice(start, start + PER_PAGE);
+        renderSessions({ sessions: paged, total });
+        renderPagination({ sessions: paged, total });
+      } else {
+        renderSessions(data);
+        renderPagination(data);
+      }
     } catch (e) {
       console.error('Log sessions error:', e);
     }
@@ -35,9 +48,6 @@ const Log = (() => {
   function renderSessions(data) {
     const tbody = document.getElementById('log-table-body');
     let sessions = data.sessions;
-    if (_filterComputer) {
-      sessions = sessions.filter(s => s.computer === _filterComputer);
-    }
 
     if (!sessions.length) {
       tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-600">No sessions.</td></tr>';
@@ -134,6 +144,14 @@ const Log = (() => {
   // ── Modal ────────────────────────────────────────────────────────
 
   function bindModal() {
+    if (_modalBound) {
+      // Reset defaults each load even if already bound
+      document.getElementById('manual-date').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('manual-hours').value = '8';
+      document.getElementById('manual-note').value  = '';
+      return;
+    }
+    _modalBound = true;
     const modal     = document.getElementById('modal-manual');
     const btnOpen   = document.getElementById('btn-add-manual');
     const btnCancel = document.getElementById('btn-modal-cancel');
