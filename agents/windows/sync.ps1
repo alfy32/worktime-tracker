@@ -40,7 +40,43 @@ function Get-Config {
     }
 }
 
-function Get-RawEvents { param([datetime]$Since) }
+function Get-RawEvents {
+    param([datetime]$Since)
+
+    $sinceUtc = $Since.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.000Z")
+
+    # 4624 filtered to interactive logon types only (2=interactive, 7=unlock, 10=remote)
+    $securityLogonXPath = @"
+*[System[TimeCreated[@SystemTime >= '$sinceUtc'] and EventID=4624] and
+  EventData[Data[@Name='LogonType'] and (Data='2' or Data='7' or Data='10')]]
+"@
+
+    # lock, unlock, logoff events — no extra filtering needed
+    $securityOtherXPath = @"
+*[System[TimeCreated[@SystemTime >= '$sinceUtc'] and
+  (EventID=4634 or EventID=4647 or EventID=4800 or EventID=4801)]]
+"@
+
+    $systemXPath = @"
+*[System[TimeCreated[@SystemTime >= '$sinceUtc'] and
+  (EventID=1074 or EventID=6006)]]
+"@
+
+    $events = @()
+    foreach ($query in @(
+        @{ Log = 'Security'; XPath = $securityLogonXPath },
+        @{ Log = 'Security'; XPath = $securityOtherXPath },
+        @{ Log = 'System';   XPath = $systemXPath }
+    )) {
+        try {
+            $events += Get-WinEvent -LogName $query.Log -FilterXPath $query.XPath -ErrorAction Stop
+        } catch {
+            if ($_.Exception.Message -notmatch 'No events were found') { throw }
+        }
+    }
+
+    return $events
+}
 
 function ConvertTo-WorktimeEvents {
     param($RawEvents)
