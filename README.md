@@ -42,6 +42,13 @@ Open `http://localhost:8000` (or `http://<your-server-ip>:8000` from another mac
 
 SQLite data is stored in `./data/worktime.db` on the host — back it up with a simple cron job. Edit `docker-compose.yml` to change the data directory path if needed.
 
+**To update:**
+
+```bash
+git pull
+docker compose up -d --build
+```
+
 ---
 
 ## Ubuntu Agent
