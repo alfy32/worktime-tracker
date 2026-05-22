@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
 SYNC_PY="$SCRIPT_DIR/sync.py"
+LISTENER_PY="$SCRIPT_DIR/lock_listener.py"
 CONFIG_DIR="$HOME/.config/worktime-tracker"
 CONFIG_FILE="$CONFIG_DIR/config"
 SYSTEMD_DIR="$HOME/.config/systemd/user"
@@ -42,6 +43,12 @@ if [[ "$COMPUTER_NAME" == *" "* ]]; then
   exit 1
 fi
 
+# ── Check dependencies ───────────────────────────────────────────
+if ! python3 -c "import dbus" 2>/dev/null; then
+  echo "Installing python3-dbus..."
+  sudo apt-get install -y python3-dbus python3-gi
+fi
+
 # ── Write config ─────────────────────────────────────────────────
 mkdir -p "$CONFIG_DIR"
 cat > "$CONFIG_FILE" <<EOF
@@ -61,7 +68,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-EnvironmentFile=%h/.config/worktime-tracker/config
+EnvironmentFile=-%h/.config/worktime-tracker/config
 ExecStart=/usr/bin/python3 "$SYNC_PY"
 StandardOutput=journal
 StandardError=journal
@@ -80,6 +87,25 @@ Unit=worktime-sync.service
 WantedBy=timers.target
 EOF
 
+cat > "$SYSTEMD_DIR/worktime-lock-listener.service" <<EOF
+[Unit]
+Description=Work Time Tracker — lock/unlock listener
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/worktime-tracker/config
+ExecStart=/usr/bin/python3 "$LISTENER_PY"
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target
+EOF
+
 echo "Wrote systemd unit files to $SYSTEMD_DIR"
 
 # ── Enable and (re)start ─────────────────────────────────────────
@@ -87,6 +113,9 @@ systemctl --user daemon-reload
 systemctl --user enable worktime-sync.timer
 systemctl --user restart worktime-sync.timer
 echo "Timer enabled and (re)started."
+systemctl --user enable worktime-lock-listener.service
+systemctl --user restart worktime-lock-listener.service
+echo "Lock listener enabled and (re)started."
 
 # ── Initial sync ─────────────────────────────────────────────────
 echo ""
@@ -97,4 +126,5 @@ WORKTIME_SERVER_URL="$SERVER_URL" WORKTIME_COMPUTER_NAME="$COMPUTER_NAME" \
 echo ""
 echo "Done."
 echo "Next sync in ~1 min, then every 5 min."
-echo "Logs: journalctl --user -u worktime-sync"
+echo "Sync logs:   journalctl --user -u worktime-sync"
+echo "Listener logs: journalctl --user -u worktime-lock-listener"

@@ -28,23 +28,6 @@ class TestParseEvents:
         lines = [entry(0, 'New session c1 of user alan.')]
         assert parse_events(lines) == []
 
-    def test_lock_produces_logout(self):
-        lines = [
-            entry(0,    'New session c1 of user alan on seat seat0.'),
-            entry(3600, 'Session c1 locked.'),
-        ]
-        events = parse_events(lines)
-        assert [e['action'] for e in events] == ['login', 'logout']
-
-    def test_unlock_produces_login(self):
-        lines = [
-            entry(0, 'New session c1 of user alan on seat seat0.'),
-            entry(1, 'Session c1 locked.'),
-            entry(2, 'Session c1 unlocked.'),
-        ]
-        events = parse_events(lines)
-        assert [e['action'] for e in events] == ['login', 'logout', 'login']
-
     def test_logged_out_produces_logout(self):
         lines = [
             entry(0, 'New session c1 of user alan on seat seat0.'),
@@ -60,11 +43,6 @@ class TestParseEvents:
         ]
         assert [e['action'] for e in parse_events(lines)] == ['login', 'logout']
 
-    def test_lock_on_untracked_session_ignored(self):
-        # Lock event for a session we never saw open — ignore it
-        lines = [entry(0, 'Session c99 locked.')]
-        assert parse_events(lines) == []
-
     def test_removed_on_untracked_session_ignored(self):
         lines = [entry(0, 'Removed session c99.')]
         assert parse_events(lines) == []
@@ -72,7 +50,7 @@ class TestParseEvents:
     def test_output_sorted_by_timestamp(self):
         # Feed events out of order — output must be sorted ascending
         lines = [
-            entry(2, 'Session c1 locked.'),
+            entry(2, 'Removed session c1.'),
             entry(0, 'New session c1 of user alan on seat seat0.'),
         ]
         events = parse_events(lines)
@@ -92,7 +70,7 @@ class TestParseEvents:
         lines = [
             entry(0, 'New session c1 of user alan on seat seat0.'),
             entry(1, 'New session c2 of user alan on seat seat0.'),
-            entry(2, 'Session c1 locked.'),
+            entry(2, 'Removed session c1.'),
             entry(3, 'Session c2 logged out.'),
         ]
         events = parse_events(lines)

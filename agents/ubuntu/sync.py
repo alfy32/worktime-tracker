@@ -12,8 +12,6 @@ import urllib.request
 from datetime import datetime
 
 _NEW_SESSION = re.compile(r'^New session (\S+) of user (\S+) on seat seat0\.')
-_LOCKED      = re.compile(r'^Session (\S+) locked\.')
-_UNLOCKED    = re.compile(r'^Session (\S+) unlocked\.')
 _LOGGED_OUT  = re.compile(r'^Session (\S+) logged out\.')
 _REMOVED     = re.compile(r'^Removed session (\S+)\.')
 
@@ -112,17 +110,6 @@ def parse_events(lines, username=None):
                     graphical_sessions.add(m.group(1))
                     events.append({'timestamp': iso, 'action': 'login'})
                 continue
-
-        # Lock/unlock have no CODE_FUNC in any systemd version — always regex-parsed
-        m = _LOCKED.match(msg)
-        if m and m.group(1) in graphical_sessions:
-            events.append({'timestamp': iso, 'action': 'logout'})
-            continue
-
-        m = _UNLOCKED.match(msg)
-        if m and m.group(1) in graphical_sessions:
-            events.append({'timestamp': iso, 'action': 'login'})
-            continue
 
         if not session_id:
             m = _LOGGED_OUT.match(msg)
