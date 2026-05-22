@@ -108,5 +108,37 @@ Describe "ConvertTo-WorktimeEvents" {
         ConvertTo-WorktimeEvents @() | Should -BeNullOrEmpty
     }
 }
-Describe "Get-Config" { }
+Describe "Get-Config" {
+    BeforeEach {
+        Remove-Item Env:\WORKTIME_SERVER_URL   -ErrorAction SilentlyContinue
+        Remove-Item Env:\WORKTIME_COMPUTER_NAME -ErrorAction SilentlyContinue
+    }
+
+    It "reads serverUrl and computerName from config file" {
+        $tmp = Join-Path $TestDrive "config.json"
+        '{"serverUrl":"http://192.168.0.125:8000","computerName":"windows"}' | Set-Content $tmp
+        $result = Get-Config -ConfigPath $tmp
+        $result.serverUrl    | Should -Be "http://192.168.0.125:8000"
+        $result.computerName | Should -Be "windows"
+    }
+
+    It "strips trailing slash from serverUrl" {
+        $tmp = Join-Path $TestDrive "config.json"
+        '{"serverUrl":"http://192.168.0.125:8000/","computerName":"windows"}' | Set-Content $tmp
+        $result = Get-Config -ConfigPath $tmp
+        $result.serverUrl | Should -Be "http://192.168.0.125:8000"
+    }
+
+    It "reads from environment variables when config file is absent" {
+        $env:WORKTIME_SERVER_URL    = "http://10.0.0.1:8000"
+        $env:WORKTIME_COMPUTER_NAME = "mypc"
+        $result = Get-Config -ConfigPath (Join-Path $TestDrive "missing.json")
+        $result.serverUrl    | Should -Be "http://10.0.0.1:8000"
+        $result.computerName | Should -Be "mypc"
+    }
+
+    It "throws when serverUrl is not set anywhere" {
+        { Get-Config -ConfigPath (Join-Path $TestDrive "missing.json") } | Should -Throw
+    }
+}
 Describe "Send-WorktimeEvents" { }

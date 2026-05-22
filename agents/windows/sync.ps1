@@ -16,7 +16,29 @@ $CONFIG_PATH      = Join-Path $env:APPDATA "worktime-tracker\config.json"
 $LOGIN_EVENT_IDS  = @(4624, 4801)
 $LOGOUT_EVENT_IDS = @(4634, 4647, 4800, 1074, 6006)
 
-function Get-Config { param([string]$ConfigPath = $CONFIG_PATH) }
+function Get-Config {
+    param([string]$ConfigPath = $CONFIG_PATH)
+    $serverUrl    = $env:WORKTIME_SERVER_URL
+    $computerName = $env:WORKTIME_COMPUTER_NAME
+
+    if ((-not $serverUrl -or -not $computerName) -and (Test-Path $ConfigPath)) {
+        $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+        if (-not $serverUrl)    { $serverUrl    = $cfg.serverUrl }
+        if (-not $computerName) { $computerName = $cfg.computerName }
+    }
+
+    if (-not $serverUrl) {
+        throw "WORKTIME_SERVER_URL not set. Run install.ps1 first."
+    }
+    if (-not $computerName) {
+        $computerName = $env:COMPUTERNAME
+    }
+
+    return @{
+        serverUrl    = $serverUrl.TrimEnd('/')
+        computerName = $computerName
+    }
+}
 
 function Get-RawEvents { param([datetime]$Since) }
 
