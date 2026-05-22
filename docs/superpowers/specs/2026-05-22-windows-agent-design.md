@@ -117,16 +117,19 @@ Steps:
 
 ## Task Scheduler Configuration
 
-One task (`WorktimeTracker-Sync`) with two triggers:
+One task (`WorktimeTracker-Sync`) with three triggers:
 
 ```
 Name:        WorktimeTracker-Sync
 Run as:      Current user (admin account)
 Privileges:  Highest (required to read Security Event Log)
 Triggers:    At logon
+             On Event: Log=Security, EventID=4801 (workstation unlocked)
              Every 5 minutes (repeat indefinitely, no expiry)
 Action:      powershell.exe -NonInteractive -ExecutionPolicy Bypass -File "C:\...\sync.ps1"
 ```
+
+The logon and unlock triggers ensure the dashboard updates immediately when the user sits down. The 5-minute repeat catches any gaps in between.
 
 The absolute path to `sync.ps1` is resolved at install time from the installer's own location.
 
