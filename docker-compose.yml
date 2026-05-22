@@ -7,4 +7,5 @@ services:
       - ./data:/app/data   # host path — adjust on the home server to wherever you want the file
     environment:
       - DATABASE_URL=sqlite:////app/data/worktime.db
+      - TZ=America/Denver
     restart: unless-stopped
