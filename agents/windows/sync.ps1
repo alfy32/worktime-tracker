@@ -20,7 +20,26 @@ function Get-Config { param([string]$ConfigPath = $CONFIG_PATH) }
 
 function Get-RawEvents { param([datetime]$Since) }
 
-function ConvertTo-WorktimeEvents { param($RawEvents) }
+function ConvertTo-WorktimeEvents {
+    param($RawEvents)
+    if (-not $RawEvents -or $RawEvents.Count -eq 0) { return @() }
+
+    $actionMap = @{}
+    foreach ($id in $LOGIN_EVENT_IDS)  { $actionMap[$id] = "login" }
+    foreach ($id in $LOGOUT_EVENT_IDS) { $actionMap[$id] = "logout" }
+
+    $events = @()
+    foreach ($raw in $RawEvents) {
+        if ($actionMap.ContainsKey([int]$raw.Id)) {
+            $events += @{
+                timestamp = $raw.TimeCreated.ToString("yyyy-MM-ddTHH:mm:ss")
+                action    = $actionMap[[int]$raw.Id]
+            }
+        }
+    }
+
+    return @($events | Sort-Object { $_.timestamp })
+}
 
 function Remove-ConsecutiveDuplicates {
     param($Events)

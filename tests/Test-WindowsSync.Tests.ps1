@@ -48,6 +48,65 @@ Describe "Remove-ConsecutiveDuplicates" {
         $result[0].timestamp | Should -Be "2026-05-22T09:00:00"
     }
 }
-Describe "ConvertTo-WorktimeEvents" { }
+Describe "ConvertTo-WorktimeEvents" {
+    It "maps event 4624 to login" {
+        $raw = @([PSCustomObject]@{ Id = 4624; TimeCreated = [datetime]"2026-05-22T09:00:00" })
+        (ConvertTo-WorktimeEvents $raw)[0].action | Should -Be "login"
+    }
+
+    It "maps event 4801 to login" {
+        $raw = @([PSCustomObject]@{ Id = 4801; TimeCreated = [datetime]"2026-05-22T09:00:00" })
+        (ConvertTo-WorktimeEvents $raw)[0].action | Should -Be "login"
+    }
+
+    It "maps event 4634 to logout" {
+        $raw = @([PSCustomObject]@{ Id = 4634; TimeCreated = [datetime]"2026-05-22T17:00:00" })
+        (ConvertTo-WorktimeEvents $raw)[0].action | Should -Be "logout"
+    }
+
+    It "maps event 4647 to logout" {
+        $raw = @([PSCustomObject]@{ Id = 4647; TimeCreated = [datetime]"2026-05-22T17:00:00" })
+        (ConvertTo-WorktimeEvents $raw)[0].action | Should -Be "logout"
+    }
+
+    It "maps event 4800 to logout" {
+        $raw = @([PSCustomObject]@{ Id = 4800; TimeCreated = [datetime]"2026-05-22T12:00:00" })
+        (ConvertTo-WorktimeEvents $raw)[0].action | Should -Be "logout"
+    }
+
+    It "maps event 1074 to logout" {
+        $raw = @([PSCustomObject]@{ Id = 1074; TimeCreated = [datetime]"2026-05-22T17:00:00" })
+        (ConvertTo-WorktimeEvents $raw)[0].action | Should -Be "logout"
+    }
+
+    It "maps event 6006 to logout" {
+        $raw = @([PSCustomObject]@{ Id = 6006; TimeCreated = [datetime]"2026-05-22T17:00:00" })
+        (ConvertTo-WorktimeEvents $raw)[0].action | Should -Be "logout"
+    }
+
+    It "formats timestamp as yyyy-MM-ddTHH:mm:ss" {
+        $raw = @([PSCustomObject]@{ Id = 4624; TimeCreated = [datetime]"2026-05-22T09:05:30" })
+        (ConvertTo-WorktimeEvents $raw)[0].timestamp | Should -Be "2026-05-22T09:05:30"
+    }
+
+    It "sorts output by timestamp ascending" {
+        $raw = @(
+            [PSCustomObject]@{ Id = 4634; TimeCreated = [datetime]"2026-05-22T17:00:00" },
+            [PSCustomObject]@{ Id = 4624; TimeCreated = [datetime]"2026-05-22T09:00:00" }
+        )
+        $result = ConvertTo-WorktimeEvents $raw
+        $result[0].timestamp | Should -Be "2026-05-22T09:00:00"
+        $result[1].timestamp | Should -Be "2026-05-22T17:00:00"
+    }
+
+    It "ignores unknown event IDs" {
+        $raw = @([PSCustomObject]@{ Id = 9999; TimeCreated = [datetime]"2026-05-22T09:00:00" })
+        ConvertTo-WorktimeEvents $raw | Should -BeNullOrEmpty
+    }
+
+    It "returns empty for empty input" {
+        ConvertTo-WorktimeEvents @() | Should -BeNullOrEmpty
+    }
+}
 Describe "Get-Config" { }
 Describe "Send-WorktimeEvents" { }
