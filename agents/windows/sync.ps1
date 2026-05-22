@@ -22,7 +22,17 @@ function Get-RawEvents { param([datetime]$Since) }
 
 function ConvertTo-WorktimeEvents { param($RawEvents) }
 
-function Remove-ConsecutiveDuplicates { param($Events) }
+function Remove-ConsecutiveDuplicates {
+    param($Events)
+    if (-not $Events -or $Events.Count -eq 0) { return @() }
+    $result = @($Events[0])
+    foreach ($event in $Events[1..($Events.Count - 1)]) {
+        if ($event.action -ne $result[-1].action) {
+            $result += $event
+        }
+    }
+    return $result
+}
 
 function Send-WorktimeEvents {
     param([string]$ServerUrl, [string]$ComputerName, $Events)
