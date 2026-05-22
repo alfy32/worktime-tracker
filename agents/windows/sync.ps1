@@ -129,7 +129,34 @@ function Send-WorktimeEvents {
         -ContentType "application/json"
 }
 
-function Main { param([string]$Since = "") }
+function Main {
+    param([string]$Since = "")
+
+    $cfg = Get-Config
+
+    $sinceDate = if ($Since) {
+        [datetime]::Parse($Since)
+    } else {
+        (Get-Date).AddDays(-7)
+    }
+
+    Write-Host "Querying events since $($sinceDate.ToString('yyyy-MM-dd HH:mm:ss'))..."
+    $rawEvents = Get-RawEvents -Since $sinceDate
+    $events    = ConvertTo-WorktimeEvents -RawEvents $rawEvents
+    $events    = Remove-ConsecutiveDuplicates -Events $events
+
+    if ($events.Count -eq 0) {
+        Write-Host "No new events."
+        return
+    }
+
+    $result = Send-WorktimeEvents `
+        -ServerUrl    $cfg.serverUrl `
+        -ComputerName $cfg.computerName `
+        -Events       $events
+
+    Write-Host "Synced $($events.Count) events ($($result.inserted) inserted, $($result.skipped) skipped)"
+}
 
 if ($MyInvocation.InvocationName -ne '.') {
     Main -Since $Since
