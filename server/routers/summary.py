@@ -20,10 +20,15 @@ router = APIRouter()
 
 def _get_cfg(db: Session) -> dict:
     rows = {s.key: s.value for s in db.query(Settings).all()}
+    if "tracking_start_date" in rows:
+        tracking_start = date.fromisoformat(rows["tracking_start_date"])
+    else:
+        first = db.query(Event).order_by(Event.timestamp).first()
+        tracking_start = first.timestamp.date() if first else date.today()
     return {
         "weekly_target": float(rows.get("weekly_target_hours", "40")),
         "daily_target":  float(rows.get("daily_target_hours",  "8")),
-        "tracking_start": date.fromisoformat(rows.get("tracking_start_date", "2026-01-01")),
+        "tracking_start": tracking_start,
     }
 
 
