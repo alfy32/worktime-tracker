@@ -76,7 +76,21 @@ function Remove-ConsecutiveDuplicates {
 }
 
 function Send-WorktimeEvents {
-    param([string]$ServerUrl, [string]$ComputerName, $Events)
+    param(
+        [string]$ServerUrl,
+        [string]$ComputerName,
+        $Events
+    )
+    $payload = @{
+        computer = $ComputerName
+        events   = @($Events)
+    } | ConvertTo-Json -Depth 3
+
+    return Invoke-RestMethod `
+        -Uri    "$ServerUrl/api/sync" `
+        -Method POST `
+        -Body   $payload `
+        -ContentType "application/json"
 }
 
 function Main { param([string]$Since = "") }

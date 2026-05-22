@@ -141,4 +141,36 @@ Describe "Get-Config" {
         { Get-Config -ConfigPath (Join-Path $TestDrive "missing.json") } | Should -Throw
     }
 }
-Describe "Send-WorktimeEvents" { }
+Describe "Send-WorktimeEvents" {
+    It "POSTs to /api/sync with correct payload" {
+        Mock Invoke-RestMethod {
+            $script:capturedUri  = $Uri
+            $script:capturedBody = $Body | ConvertFrom-Json
+            return [PSCustomObject]@{ inserted = 2; skipped = 0 }
+        }
+        $events = @(
+            @{ timestamp = "2026-05-22T09:00:00"; action = "login" },
+            @{ timestamp = "2026-05-22T17:00:00"; action = "logout" }
+        )
+        Send-WorktimeEvents -ServerUrl "http://server:8000" -ComputerName "mypc" -Events $events
+        $script:capturedUri              | Should -Be "http://server:8000/api/sync"
+        $script:capturedBody.computer    | Should -Be "mypc"
+        $script:capturedBody.events.Count | Should -Be 2
+    }
+
+    It "returns inserted and skipped counts" {
+        Mock Invoke-RestMethod { return [PSCustomObject]@{ inserted = 1; skipped = 3 } }
+        $result = Send-WorktimeEvents -ServerUrl "http://server:8000" -ComputerName "mypc" `
+            -Events @(@{ timestamp = "2026-05-22T09:00:00"; action = "login" })
+        $result.inserted | Should -Be 1
+        $result.skipped  | Should -Be 3
+    }
+
+    It "throws on connection error" {
+        Mock Invoke-RestMethod { throw [System.Net.WebException]::new("Connection refused") }
+        {
+            Send-WorktimeEvents -ServerUrl "http://server:8000" -ComputerName "mypc" `
+                -Events @(@{ timestamp = "2026-05-22T09:00:00"; action = "login" })
+        } | Should -Throw
+    }
+}
