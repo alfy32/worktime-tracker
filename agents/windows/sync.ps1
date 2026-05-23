@@ -74,7 +74,7 @@ function Get-RawEvents {
         try {
             $events += Get-WinEvent -LogName $query.Log -FilterXPath $query.XPath -ErrorAction Stop
         } catch {
-            if ($_.Exception.Message -notmatch 'No events were found') { throw }
+            if ($_.FullyQualifiedErrorId -notmatch 'NoMatchingEventsFound') { throw }
         }
     }
 
@@ -105,6 +105,7 @@ function ConvertTo-WorktimeEvents {
 function Remove-ConsecutiveDuplicates {
     param($Events)
     if (-not $Events -or $Events.Count -eq 0) { return @() }
+    if ($Events.Count -eq 1) { return @($Events[0]) }
     $result = @($Events[0])
     foreach ($event in $Events[1..($Events.Count - 1)]) {
         if ($event.action -ne $result[-1].action) {
@@ -126,10 +127,11 @@ function Send-WorktimeEvents {
     } | ConvertTo-Json -Depth 3
 
     return Invoke-RestMethod `
-        -Uri    "$ServerUrl/api/sync" `
-        -Method POST `
-        -Body   $payload `
-        -ContentType "application/json"
+        -Uri         "$ServerUrl/api/sync" `
+        -Method      POST `
+        -Body        $payload `
+        -ContentType "application/json" `
+        -TimeoutSec  30
 }
 
 function Main {
