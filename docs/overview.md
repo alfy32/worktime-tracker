@@ -22,7 +22,7 @@ Three components:
   lock_listener.py              Docker container
                                      │
 [Windows computer]          Web UI (port 8000)
-  sync.ps1          ──POST──▶   (same server)
+  report-event.ps1  ──POST──▶   (same server)
 ```
 
 1. **Sync agents** — scripts on each computer read OS login history and POST it to the server
@@ -65,31 +65,24 @@ This complements the journal sync agent: `sync.py` owns session-level events (lo
 
 ### Windows Agent
 
-A single PowerShell script (`sync.ps1`) runs via Task Scheduler with no persistent background process. It queries the Windows Security and System Event Logs for all relevant events and POSTs them to the server.
+Two PowerShell scripts run via Task Scheduler — no persistent background process, no Event Log reading.
 
-**Event sources:**
+**`report-event.ps1`** — called by both tasks. Posts a single event immediately and exits. Uses a 5-second timeout; silently fails if the network is down (the event is lost).
 
-| Event ID | Log | Action |
-|----------|-----|--------|
-| 4624 (logon types 2, 7, 10 only) | Security | `login` |
-| 4801 | Security | `login` (workstation unlocked) |
-| 4634, 4647 | Security | `logout` |
-| 4800 | Security | `logout` (workstation locked) |
-| 1074 | System | `logout` (shutdown/restart initiated) |
-| 6006 | System | `logout` (clean shutdown) |
+**Task Scheduler triggers (two tasks):**
 
-Logon types 3 (network), 4 (batch), and 5 (service) are excluded via XPath filter — only interactive sessions count.
+`WorktimeTracker-Login` fires on:
+- Session unlock (Win+L → unlock)
+- User logon
 
-The script defaults to pulling the last 7 days on every run. The installer runs an initial sync from January 1st of the current year to pull in historical data from the Event Log.
+`WorktimeTracker-Logout` fires on:
+- Session lock (Win+L)
+- Event ID 4647 (user-initiated logoff)
+- Event ID 1074 (shutdown/restart)
 
-**Consecutive same-action events are deduplicated** — e.g., a lock event immediately followed by a shutdown produces only one `logout`.
+No admin privileges required. Both tasks run as `InteractiveToken` at `LeastPrivilege`.
 
-**Task Scheduler triggers (three total):**
-1. At logon — so the dashboard is current when you sit down
-2. On Event ID 4801 (workstation unlock) — immediate update after unlocking
-3. Every 5 minutes — catches any gaps
-
-Admin privileges are required to read the Security Event Log. The task runs at `HighestAvailable` privilege level.
+**Known limitation:** On shutdown, Windows may kill the task before `report-event.ps1` completes — the logout event is lost. This is a Windows constraint; a service would be required to guarantee delivery.
 
 **Config file:** `%APPDATA%\worktime-tracker\config.json`
 ```json
@@ -148,8 +141,8 @@ If the result is ≤ 0, the dashboard shows "You're done for today."
 
 | File | Purpose |
 |------|---------|
-| `sync.ps1` | Event Log querier, event mapper, deduplicator, HTTP POST, main entry point |
-| `install.ps1` | Config prompts, Task Scheduler XML registration, initial historical sync |
+| `report-event.ps1` | Posts a single login or logout event instantly; called by both Task Scheduler tasks |
+| `install.ps1` | Config prompts, Task Scheduler XML registration |
 
 ---
 
