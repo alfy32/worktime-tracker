@@ -24,7 +24,7 @@ def list_sessions(
 ):
     now = datetime.now()
     all_events = db.query(Event).order_by(Event.timestamp).all()
-    sessions = build_sessions(all_events, now)
+    sessions = list(reversed(build_sessions(all_events, now)))
     total = len(sessions)
     start = (page - 1) * per_page
     return SessionsResponse(

@@ -82,7 +82,7 @@ const Daily = (() => {
     }
 
     const dateStr = rows[i].date;
-    const sessions = sessionsForDate(dateStr);
+    const sessions = sessionsForDate(dateStr).slice().sort((a, b) => new Date(a.login_at) - new Date(b.login_at));
     if (!sessions.length) return;
 
     const container = document.getElementById('sess-' + i);

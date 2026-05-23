@@ -39,6 +39,7 @@ const App = (() => {
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => showTab(btn.dataset.tab));
     });
+    document.getElementById('nav-logo').addEventListener('click', () => showTab('dashboard'));
     document.getElementById('nav-hamburger').addEventListener('click', () => {
       document.getElementById('nav-menu').classList.toggle('hidden');
     });

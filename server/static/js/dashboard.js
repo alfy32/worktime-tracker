@@ -32,6 +32,7 @@ const Dashboard = (() => {
       renderStatus(today);
       renderWeekCard(week);
       renderRecentChart(daily);
+      renderTodaySessions(today.sessions);
     } catch (e) {
       console.error('Dashboard error:', e);
       const el = document.getElementById('hero-sub');
@@ -104,6 +105,30 @@ const Dashboard = (() => {
       return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
     Charts.makeOrUpdate('chart-recent', labels, days.map(d => d.hours), 8);
+  }
+
+  function renderTodaySessions(sessions) {
+    const el = document.getElementById('today-sessions-list');
+    if (!sessions || !sessions.length) {
+      el.innerHTML = '<div class="px-4 py-3 text-slate-500 text-sm">No sessions today.</div>';
+      return;
+    }
+    const sorted = sessions.slice().sort((a, b) => new Date(a.login_at) - new Date(b.login_at));
+    el.innerHTML = sorted.map(s => {
+      const start = fmtTime(s.login_at);
+      const end   = s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>';
+      const badge = s.is_work
+        ? '<span class="text-xs px-2 py-0.5 rounded bg-teal-900 text-teal-300">Work</span>'
+        : '<span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">Non-work</span>';
+      return (
+        '<div class="flex items-center gap-3 px-4 py-3 border-t border-slate-700 text-sm flex-wrap">' +
+          '<span class="text-slate-300 tabular-nums shrink-0">' + start + ' – ' + end + '</span>' +
+          '<span class="text-teal-400 font-medium shrink-0">' + fmtH(s.duration_hours) + '</span>' +
+          '<span class="text-slate-500 text-xs shrink-0">' + s.computer + '</span>' +
+          '<span class="ml-auto">' + badge + '</span>' +
+        '</div>'
+      );
+    }).join('');
   }
 
   return { load };
