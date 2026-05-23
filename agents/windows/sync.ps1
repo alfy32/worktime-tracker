@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Work Time Tracker — Windows sync agent.
+    Work Time Tracker - Windows sync agent.
     Reads login/logout/lock/unlock events from the Windows Event Log
     and POSTs them to the work time tracker server.
 .PARAMETER Since
@@ -54,7 +54,7 @@ function Get-RawEvents {
   EventData[Data[@Name='LogonType'] and (Data='2' or Data='7' or Data='10')]]
 "@
 
-    # lock, unlock, logoff events — no extra filtering needed
+    # lock, unlock, logoff events - no extra filtering needed
     $securityOtherXPath = @"
 *[System[TimeCreated[@SystemTime >= '$sinceUtc'] and
   (EventID=4634 or EventID=4647 or EventID=4800 or EventID=4801)]]
