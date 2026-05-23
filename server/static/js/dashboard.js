@@ -112,26 +112,68 @@ const Dashboard = (() => {
 
   function renderTodaySessions(sessions) {
     const el = document.getElementById('today-sessions-list');
+    if (el.querySelector('.ds-note:focus')) return; // don't disrupt active note editing
     if (!sessions || !sessions.length) {
       el.innerHTML = '<div class="px-4 py-3 text-slate-500 text-sm">No sessions today.</div>';
       return;
     }
     const sorted = sessions.slice().sort((a, b) => new Date(b.login_at) - new Date(a.login_at));
-    el.innerHTML = sorted.map(s => {
-      const start = fmtTime(s.login_at);
-      const end   = s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>';
-      const badge = s.is_work
-        ? '<span class="text-xs px-2 py-0.5 rounded bg-teal-900 text-teal-300">Work</span>'
-        : '<span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">Non-work</span>';
+
+    el.innerHTML = sorted.map((s, idx) => {
+      const start   = fmtTime(s.login_at);
+      const end     = s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>';
+      const workCls = s.is_work ? 'bg-teal-900 text-teal-300' : 'bg-slate-700 text-slate-400';
       return (
-        '<div class="flex items-center gap-3 px-4 py-3 border-t border-slate-700 text-sm flex-wrap">' +
-          '<span class="text-slate-300 tabular-nums shrink-0">' + start + ' – ' + end + '</span>' +
-          '<span class="text-teal-400 font-medium shrink-0">' + fmtH(s.duration_hours) + '</span>' +
-          '<span class="text-slate-500 text-xs shrink-0">' + s.computer + '</span>' +
-          '<span class="ml-auto">' + badge + '</span>' +
+        '<div class="border-t border-slate-700">' +
+          '<div class="flex items-center gap-3 px-4 py-3 text-sm flex-wrap">' +
+            '<span class="text-slate-300 tabular-nums shrink-0">' + start + ' – ' + end + '</span>' +
+            '<span class="text-teal-400 font-medium shrink-0">' + fmtH(s.duration_hours) + '</span>' +
+            '<span class="text-slate-500 text-xs shrink-0">' + s.computer + '</span>' +
+            '<button class="ds-work-toggle ml-auto text-xs px-2 py-0.5 rounded ' + workCls + '" data-idx="' + idx + '">' +
+              (s.is_work ? 'Work' : 'Non-work') +
+            '</button>' +
+          '</div>' +
+          '<div class="px-4 pb-3">' +
+            '<input class="ds-note bg-transparent text-slate-400 text-xs w-full placeholder-slate-600 outline-none border-b border-transparent focus:border-slate-500 transition-colors" ' +
+              'data-idx="' + idx + '" placeholder="Add note…">' +
+          '</div>' +
         '</div>'
       );
     }).join('');
+
+    // Set note values via DOM to avoid HTML-escaping issues
+    sorted.forEach((s, idx) => {
+      const input = el.querySelector('.ds-note[data-idx="' + idx + '"]');
+      if (input) input.value = s.note || '';
+    });
+
+    el.querySelectorAll('.ds-work-toggle').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const s = sorted[parseInt(btn.dataset.idx)];
+        try {
+          await api.patchSession(s.id, { is_work: !s.is_work, note: s.note || null });
+          Dashboard.load();
+        } catch (e) { console.error('Toggle error:', e); }
+      });
+    });
+
+    el.querySelectorAll('.ds-note').forEach(input => {
+      const s = sorted[parseInt(input.dataset.idx)];
+      input.addEventListener('blur', async () => {
+        const newNote = input.value.trim() || null;
+        if (newNote === (s.note || null)) return;
+        try {
+          await api.patchSession(s.id, { is_work: s.is_work, note: newNote });
+          Dashboard.load();
+        } catch (e) {
+          console.error('Note error:', e);
+          input.value = s.note || '';
+        }
+      });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      });
+    });
   }
 
   return { load };
