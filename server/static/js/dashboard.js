@@ -73,20 +73,20 @@ const Dashboard = (() => {
     const compEl  = document.getElementById('status-computer');
     const detEl   = document.getElementById('status-detail');
     const splitEl = document.getElementById('status-split');
-    const s = t.status;
 
-    if (s.logged_in) {
-      compEl.textContent = 'Logged in on ' + (s.computer || 'unknown');
-      compEl.style.color = 'rgb(45,212,191)'; // teal-400
-      detEl.textContent  = (s.since ? fmtAgo(s.since) + ' · ' : '') + fmtH(t.hours_worked) + ' today';
+    const activeComputers = [...new Set((t.sessions || []).filter(s => s.is_active).map(s => s.computer))];
+
+    if (activeComputers.length > 0) {
+      compEl.textContent = 'Logged in · ' + activeComputers.join(', ');
+      compEl.style.color = 'rgb(45,212,191)';
+      detEl.textContent  = fmtH(t.hours_worked) + ' today';
     } else {
-      compEl.textContent = s.computer ? 'Logged out · ' + s.computer : 'No recent activity';
+      compEl.textContent = 'Logged out';
       compEl.style.color = '';
-      detEl.textContent  = s.since ? 'Last seen ' + fmtAgo(s.since) : '';
+      detEl.textContent  = t.status.since ? 'Last seen ' + fmtAgo(t.status.since) : 'No recent activity';
     }
 
-    const parts = Object.entries(t.per_computer)
-      .map(([c, h]) => c + ' ' + fmtH(h));
+    const parts = Object.entries(t.per_computer).map(([c, h]) => c + ' ' + fmtH(h));
     splitEl.textContent = parts.join(' · ');
   }
 
