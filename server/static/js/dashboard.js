@@ -77,9 +77,11 @@ const Dashboard = (() => {
     const activeComputers = [...new Set((t.sessions || []).filter(s => s.is_active).map(s => s.computer))];
 
     if (activeComputers.length > 0) {
+      const activeSessions = (t.sessions || []).filter(s => s.is_active);
+      const mostRecent = activeSessions.sort((a, b) => new Date(b.login_at) - new Date(a.login_at))[0];
       compEl.textContent = 'Logged in · ' + activeComputers.join(', ');
       compEl.style.color = 'rgb(45,212,191)';
-      detEl.textContent  = fmtH(t.hours_worked) + ' today';
+      detEl.textContent  = (mostRecent ? fmtAgo(mostRecent.login_at) + ' · ' : '') + fmtH(t.hours_worked) + ' today';
     } else {
       compEl.textContent = 'Logged out';
       compEl.style.color = '';
