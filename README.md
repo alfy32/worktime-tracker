@@ -10,7 +10,7 @@ The dashboard shows a live stop time based on how many hours you've worked this 
 
 ## Features
 
-- Automatic login/logout tracking on Ubuntu (Windows agent planned)
+- Automatic login/logout tracking on Ubuntu and Windows
 - Screen lock/unlock counted as work pauses
 - Running hours bank — overworked weeks reduce future targets, underworked weeks raise them
 - Per-computer session log with is-work toggles
@@ -23,8 +23,9 @@ The dashboard shows a live stop time based on how many hours you've worked this 
 ## Requirements
 
 - Docker and Docker Compose (for the server)
-- Python 3.8+ (for the Ubuntu sync agent)
-- Ubuntu with GNOME desktop (for the lock/unlock listener)
+- Python 3.8+ with `python3-dbus` and `python3-gi` (Ubuntu agent — installed automatically)
+- Ubuntu with GNOME desktop (Ubuntu agent)
+- Windows 10/11 with PowerShell 5.1+ and an admin account (Windows agent)
 
 ---
 
@@ -75,12 +76,36 @@ journalctl --user -u worktime-lock-listener -f
 
 ---
 
+## Windows Agent
+
+The Windows agent reads login, logout, screen lock/unlock, shutdown, and restart events from the Windows Security and System Event Logs and syncs them to the server. No persistent background process — runs via Task Scheduler at logon, on screen unlock, and every 5 minutes.
+
+**Install (run PowerShell as Administrator):**
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process
+.\agents\windows\install.ps1
+```
+
+The script prompts for your server URL and a name for this computer, writes the config to `%APPDATA%\worktime-tracker\config.json`, registers the scheduled task, and runs an initial sync from January 1st of the current year to pull in historical data.
+
+**Check task status:**
+
+```powershell
+Get-ScheduledTask -TaskName WorktimeTracker-Sync | Get-ScheduledTaskInfo
+```
+
+**Admin account required:** The Security Event Log (which contains login/lock/unlock events) requires elevated access to read.
+
+---
+
 ## Project Layout
 
 ```
 server/          FastAPI server + SQLite + web UI
 agents/
   ubuntu/        Ubuntu sync agent and lock listener
+  windows/       Windows PowerShell sync agent and installer
 data/            SQLite database (created on first run)
-tests/           Test suite
+tests/           Test suite (Python + PowerShell/Pester)
 ```

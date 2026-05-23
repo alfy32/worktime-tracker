@@ -21,7 +21,8 @@ Three components:
   sync.py           ──POST──▶   FastAPI + SQLite
   lock_listener.py              Docker container
                                      │
-                                Web UI (port 8000)
+[Windows computer]          Web UI (port 8000)
+  sync.ps1          ──POST──▶   (same server)
 ```
 
 1. **Sync agents** — scripts on each computer read OS login history and POST it to the server
@@ -61,6 +62,42 @@ Both old-style (regex-parsed message text) and new-style (structured `CODE_FUNC`
 Subscribes to `org.gnome.ScreenSaver.ActiveChanged` on the D-Bus session bus. Fires instantly on screen lock (Super+L or idle timeout) and unlock. Posts a logout on screen lock and a login on screen unlock. Also posts a final logout on SIGTERM so shutdowns are recorded cleanly before the process exits.
 
 This complements the journal sync agent: `sync.py` owns session-level events (login at boot, logout at shutdown), `lock_listener.py` owns lock/unlock events in real time. They don't overlap, so no duplicate events.
+
+### Windows Agent
+
+A single PowerShell script (`sync.ps1`) runs via Task Scheduler with no persistent background process. It queries the Windows Security and System Event Logs for all relevant events and POSTs them to the server.
+
+**Event sources:**
+
+| Event ID | Log | Action |
+|----------|-----|--------|
+| 4624 (logon types 2, 7, 10 only) | Security | `login` |
+| 4801 | Security | `login` (workstation unlocked) |
+| 4634, 4647 | Security | `logout` |
+| 4800 | Security | `logout` (workstation locked) |
+| 1074 | System | `logout` (shutdown/restart initiated) |
+| 6006 | System | `logout` (clean shutdown) |
+
+Logon types 3 (network), 4 (batch), and 5 (service) are excluded via XPath filter — only interactive sessions count.
+
+The script defaults to pulling the last 7 days on every run. The installer runs an initial sync from January 1st of the current year to pull in historical data from the Event Log.
+
+**Consecutive same-action events are deduplicated** — e.g., a lock event immediately followed by a shutdown produces only one `logout`.
+
+**Task Scheduler triggers (three total):**
+1. At logon — so the dashboard is current when you sit down
+2. On Event ID 4801 (workstation unlock) — immediate update after unlocking
+3. Every 5 minutes — catches any gaps
+
+Admin privileges are required to read the Security Event Log. The task runs at `HighestAvailable` privilege level.
+
+**Config file:** `%APPDATA%\worktime-tracker\config.json`
+```json
+{
+  "serverUrl": "http://192.168.0.125:8000",
+  "computerName": "windows"
+}
+```
 
 ### Server-Side Deduplication
 
@@ -106,6 +143,13 @@ If the result is ≤ 0, the dashboard shows "You're done for today."
 | `sync.py` | Journal parser + HTTP POST; also the systemd service entrypoint |
 | `lock_listener.py` | D-Bus lock/unlock listener; persistent systemd service |
 | `install.sh` | Idempotent installer: config, systemd units, dep check, initial sync |
+
+### Windows Agent (`agents/windows/`)
+
+| File | Purpose |
+|------|---------|
+| `sync.ps1` | Event Log querier, event mapper, deduplicator, HTTP POST, main entry point |
+| `install.ps1` | Config prompts, Task Scheduler XML registration, initial historical sync |
 
 ---
 
@@ -203,4 +247,3 @@ Adjust the host path in `docker-compose.yml` to wherever you want the database t
 - Authentication (home network + Tailscale is sufficient)
 - Multi-user support
 - Mobile app (the web UI is responsive)
-- Windows agent (planned but not yet implemented)
