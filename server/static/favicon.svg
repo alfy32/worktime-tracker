@@ -6,14 +6,14 @@
   <!-- Lap button (left) -->
   <rect x="10" y="10" width="9" height="5" rx="2.5" fill="#475569" transform="rotate(-40 14.5 12.5)"/>
   <!-- Watch face -->
-  <circle cx="32" cy="38" r="23" fill="#0f172a" stroke="#2dd4bf" stroke-width="3"/>
+  <circle cx="32" cy="38" r="23" fill="#ffffff" stroke="#2dd4bf" stroke-width="3"/>
   <!-- Hour markers -->
   <line x1="32" y1="18" x2="32" y2="23" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
   <line x1="52" y1="38" x2="47" y2="38" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
   <line x1="32" y1="58" x2="32" y2="53" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
   <line x1="12" y1="38" x2="17" y2="38" stroke="#475569" stroke-width="2" stroke-linecap="round"/>
   <!-- Hand (~20 seconds, angled right) -->
-  <line x1="32" y1="38" x2="46" y2="27" stroke="#e2e8f0" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="32" y1="38" x2="46" y2="27" stroke="#000000" stroke-width="2.5" stroke-linecap="round"/>
   <!-- Center dot -->
   <circle cx="32" cy="38" r="3" fill="#2dd4bf"/>
 </svg>
