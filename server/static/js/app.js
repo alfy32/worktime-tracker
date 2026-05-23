@@ -18,6 +18,7 @@ const App = (() => {
       btn.classList.toggle('hover:text-slate-200', !active);
     });
 
+    document.getElementById('nav-menu').classList.add('hidden');
     clearInterval(refreshTimer);
 
     if (name === 'dashboard') {
@@ -37,6 +38,9 @@ const App = (() => {
   function init() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => showTab(btn.dataset.tab));
+    });
+    document.getElementById('nav-hamburger').addEventListener('click', () => {
+      document.getElementById('nav-menu').classList.toggle('hidden');
     });
     const hash = location.hash.replace('#', '');
     showTab(PAGES.includes(hash) ? hash : 'dashboard');

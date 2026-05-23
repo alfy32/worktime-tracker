@@ -53,8 +53,8 @@ const Daily = (() => {
           '<td class="p-4 text-slate-500 text-lg leading-none">' + (hasSessions ? '›' : '') + '</td>' +
           '<td class="p-4 font-medium">'  + fmtDate(d.date) + '</td>' +
           '<td class="p-4 text-right font-semibold ' + color + '">' + (d.hours > 0 ? fmtH(d.hours) : '—') + '</td>' +
-          '<td class="p-4 text-right text-slate-400">' + d.session_count + '</td>' +
-          '<td class="p-4 text-right text-slate-400">' + (d.longest_break_hours > 0 ? fmtH(d.longest_break_hours) : '—') + '</td>' +
+          '<td class="p-4 text-right text-slate-400 hidden sm:table-cell">' + d.session_count + '</td>' +
+          '<td class="p-4 text-right text-slate-400 hidden md:table-cell">' + (d.longest_break_hours > 0 ? fmtH(d.longest_break_hours) : '—') + '</td>' +
         '</tr>' +
         '<tr id="expand-' + i + '" class="hidden bg-slate-900 border-b border-slate-700">' +
           '<td colspan="5" class="px-8 py-3"><div id="sess-' + i + '" class="space-y-2"></div></td>' +
@@ -88,11 +88,11 @@ const Daily = (() => {
     const container = document.getElementById('sess-' + i);
     container.innerHTML = sessions.map((s, si) =>
       '<div class="flex items-center gap-3 text-xs py-1 flex-wrap" id="sr-' + i + '-' + si + '">' +
-        '<span class="text-slate-400 w-36 shrink-0">' +
+        '<span class="text-slate-400 shrink-0">' +
           fmtTime(s.login_at) + ' – ' + (s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>') +
         '</span>' +
-        '<span class="text-slate-500 w-12 shrink-0">' + fmtH(s.duration_hours) + '</span>' +
-        '<span class="text-slate-500 w-16 shrink-0">' + s.computer + '</span>' +
+        '<span class="text-slate-500 shrink-0 w-10">' + fmtH(s.duration_hours) + '</span>' +
+        '<span class="text-slate-500 shrink-0">' + s.computer + '</span>' +
         '<button class="sess-toggle px-2 py-0.5 rounded text-xs ' +
           (s.is_work ? 'bg-teal-900 text-teal-300' : 'bg-slate-700 text-slate-400') + '" ' +
           'data-ridx="' + i + '" data-sidx="' + si + '">' +

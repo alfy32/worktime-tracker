@@ -37,8 +37,8 @@ const Weekly = (() => {
         '<tr class="border-b border-slate-700 hover:bg-slate-700">' +
           '<td class="p-4 font-medium">' + fmtWeek(w.week_start) + '</td>' +
           '<td class="p-4 text-right font-semibold ' + hourColor + '">' + (w.total_hours > 0 ? fmtH(w.total_hours) : '—') + '</td>' +
-          '<td class="p-4 text-right text-slate-400">' + (w.avg_hours_per_day > 0 ? fmtH(w.avg_hours_per_day) : '—') + '</td>' +
-          '<td class="p-4 text-right ' + deltaColor + '">' + deltaStr + '</td>' +
+          '<td class="p-4 text-right text-slate-400 hidden md:table-cell">' + (w.avg_hours_per_day > 0 ? fmtH(w.avg_hours_per_day) : '—') + '</td>' +
+          '<td class="p-4 text-right ' + deltaColor + ' hidden sm:table-cell">' + deltaStr + '</td>' +
         '</tr>'
       );
     }).join('');

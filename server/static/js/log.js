@@ -70,7 +70,7 @@ const Log = (() => {
     tbody.innerHTML = sessions.map(s =>
       '<tr class="border-b border-slate-700 hover:bg-slate-700">' +
         '<td class="p-4 text-slate-300 whitespace-nowrap">' + fmtDT(s.login_at) + '</td>' +
-        '<td class="p-4 text-slate-400">' + s.computer + '</td>' +
+        '<td class="p-4 text-slate-400 hidden sm:table-cell">' + s.computer + '</td>' +
         '<td class="p-4 text-right text-slate-300 whitespace-nowrap">' + fmtH(s.duration_hours) + '</td>' +
         '<td class="p-4 text-center">' +
           '<button class="work-toggle text-xs px-2 py-0.5 rounded ' +
