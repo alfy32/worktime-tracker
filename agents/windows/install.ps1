@@ -93,7 +93,7 @@ $taskXml = @"
   <Actions>
     <Exec>
       <Command>powershell.exe</Command>
-      <Arguments>-NonInteractive -ExecutionPolicy Bypass -File "$SYNC_PS1"</Arguments>
+      <Arguments>-WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File "$SYNC_PS1"</Arguments>
     </Exec>
   </Actions>
 </Task>
