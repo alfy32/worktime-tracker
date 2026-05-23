@@ -56,6 +56,7 @@ class DayBreakdown(BaseModel):
 class WeekSummary(BaseModel):
     week_start: date
     total_hours: float
+    weekly_target: float
     adjusted_target: float
     hours_remaining: float
     remaining_weekdays: int

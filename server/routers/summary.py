@@ -159,6 +159,7 @@ def summary_week(db: Session = Depends(get_db)):
     return WeekSummary(
         week_start=week_start,
         total_hours=round(total_hours, 2),
+        weekly_target=cfg["weekly_target"],
         adjusted_target=round(adjusted_target, 2),
         hours_remaining=hours_remaining,
         remaining_weekdays=remaining_weekdays,

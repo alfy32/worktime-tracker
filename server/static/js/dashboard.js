@@ -91,9 +91,10 @@ const Dashboard = (() => {
   }
 
   function renderWeekCard(w) {
+    const remaining = Math.max(0, w.weekly_target - w.total_hours);
     document.getElementById('week-hours').textContent = fmtH(w.total_hours);
     document.getElementById('week-target').textContent =
-      'Target ' + fmtH(w.adjusted_target) + ' · ' + fmtH(w.hours_remaining) + ' remaining';
+      'Target ' + fmtH(w.weekly_target) + ' · ' + fmtH(remaining) + ' remaining';
     document.getElementById('week-remaining').textContent =
       w.remaining_weekdays + ' workday' + (w.remaining_weekdays !== 1 ? 's' : '') + ' left this week';
   }
