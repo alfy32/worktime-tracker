@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from database import engine, Base, SessionLocal
 from models import Settings
 from routers import sync, summary, sessions, manual
@@ -28,7 +30,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path == "/" or path.endswith((".html", ".js")):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
+
+
 app = FastAPI(title="Work Time Tracker", lifespan=lifespan)
+app.add_middleware(NoCacheStaticMiddleware)
 app.include_router(sync.router)
 app.include_router(summary.router)
 app.include_router(sessions.router)
