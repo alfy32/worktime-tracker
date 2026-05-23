@@ -13,7 +13,7 @@ param(
     [string]$Action
 )
 
-$configPath = Join-Path $env:APPDATA 'worktime-tracker\config.json'
+$configPath = Join-Path ([System.Environment]::GetFolderPath('ApplicationData')) 'worktime-tracker\config.json'
 if (-not (Test-Path $configPath)) { exit 0 }
 
 try {

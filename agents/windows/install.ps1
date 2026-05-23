@@ -87,7 +87,7 @@ $loginTaskXml = @"
   <Actions>
     <Exec>
       <Command>powershell.exe</Command>
-      <Arguments>-WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File "$REPORT_PS1" -Action login</Arguments>
+      <Arguments>-NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File "$REPORT_PS1" -Action login</Arguments>
     </Exec>
   </Actions>
 </Task>
@@ -118,7 +118,8 @@ $logoutTaskXml = @"
   </Triggers>
   <Principals>
     <Principal id="Author">
-      <LogonType>InteractiveToken</LogonType>
+      <UserId>$env:USERDOMAIN\$env:USERNAME</UserId>
+      <LogonType>S4U</LogonType>
       <RunLevel>LeastPrivilege</RunLevel>
     </Principal>
   </Principals>
@@ -132,7 +133,7 @@ $logoutTaskXml = @"
   <Actions>
     <Exec>
       <Command>powershell.exe</Command>
-      <Arguments>-WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File "$REPORT_PS1" -Action logout</Arguments>
+      <Arguments>-NoProfile -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File "$REPORT_PS1" -Action logout</Arguments>
     </Exec>
   </Actions>
 </Task>
