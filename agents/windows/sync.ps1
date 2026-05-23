@@ -18,14 +18,17 @@ $LOGOUT_EVENT_IDS = @(4634, 4647, 4800, 1074, 6006)
 
 function Get-Config {
     param([string]$ConfigPath = $CONFIG_PATH)
-    $serverUrl    = $env:WORKTIME_SERVER_URL
-    $computerName = $env:WORKTIME_COMPUTER_NAME
+    $serverUrl    = $null
+    $computerName = $null
 
-    if ((-not $serverUrl -or -not $computerName) -and (Test-Path $ConfigPath)) {
+    if (Test-Path $ConfigPath) {
         $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
-        if (-not $serverUrl)    { $serverUrl    = $cfg.serverUrl }
-        if (-not $computerName) { $computerName = $cfg.computerName }
+        $serverUrl    = $cfg.serverUrl
+        $computerName = $cfg.computerName
     }
+
+    if (-not $serverUrl)    { $serverUrl    = $env:WORKTIME_SERVER_URL }
+    if (-not $computerName) { $computerName = $env:WORKTIME_COMPUTER_NAME }
 
     if (-not $serverUrl) {
         throw "WORKTIME_SERVER_URL not set. Run install.ps1 first."

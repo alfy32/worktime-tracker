@@ -140,6 +140,16 @@ Describe "Get-Config" {
     It "throws when serverUrl is not set anywhere" {
         { Get-Config -ConfigPath (Join-Path $TestDrive "missing.json") } | Should -Throw
     }
+
+    It "config file values take priority over environment variables" {
+        $tmp = Join-Path $TestDrive "config.json"
+        '{"serverUrl":"http://file-server:8000","computerName":"file-computer"}' | Set-Content $tmp
+        $env:WORKTIME_SERVER_URL    = "http://env-server:8000"
+        $env:WORKTIME_COMPUTER_NAME = "env-computer"
+        $result = Get-Config -ConfigPath $tmp
+        $result.serverUrl    | Should -Be "http://file-server:8000"
+        $result.computerName | Should -Be "file-computer"
+    }
 }
 Describe "Send-WorktimeEvents" {
     It "POSTs to /api/sync with correct payload" {
