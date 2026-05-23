@@ -114,7 +114,7 @@ const Dashboard = (() => {
       el.innerHTML = '<div class="px-4 py-3 text-slate-500 text-sm">No sessions today.</div>';
       return;
     }
-    const sorted = sessions.slice().sort((a, b) => new Date(a.login_at) - new Date(b.login_at));
+    const sorted = sessions.slice().sort((a, b) => new Date(b.login_at) - new Date(a.login_at));
     el.innerHTML = sorted.map(s => {
       const start = fmtTime(s.login_at);
       const end   = s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>';
