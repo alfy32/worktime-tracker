@@ -80,7 +80,7 @@ Two PowerShell scripts run via Task Scheduler — no persistent background proce
 - Event ID 4647 (user-initiated logoff)
 - Event ID 1074 (shutdown/restart)
 
-No admin privileges required. Both tasks run as `InteractiveToken` at `LeastPrivilege`.
+The installer requires admin (to register Task Scheduler tasks). The registered tasks themselves run at `LeastPrivilege` — no elevated access at runtime.
 
 **Known limitation:** On shutdown, Windows may kill the task before `report-event.ps1` completes — the logout event is lost. This is a Windows constraint; a service would be required to guarantee delivery.
 

@@ -138,7 +138,7 @@ $logoutTaskXml = @"
 </Task>
 "@
 
-foreach ($name in @($TASK_LOGIN, $TASK_LOGOUT)) {
+foreach ($name in @($TASK_LOGIN, $TASK_LOGOUT, "WorktimeTracker-Sync")) {
     Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
 }
 Register-ScheduledTask -TaskName $TASK_LOGIN  -Xml $loginTaskXml  -Force | Out-Null

@@ -78,7 +78,7 @@ journalctl --user -u worktime-lock-listener -f
 
 ## Windows Agent
 
-The Windows agent reads login, logout, screen lock/unlock, shutdown, and restart events from the Windows Security and System Event Logs and syncs them to the server. No persistent background process — runs via Task Scheduler at logon, on screen unlock, and every 5 minutes.
+The Windows agent posts login, logout, screen lock/unlock, shutdown, and restart events to the server instantly via Task Scheduler. No persistent background process — two tasks fire `report-event.ps1` the moment each event occurs.
 
 **Install (run PowerShell as Administrator):**
 
@@ -87,15 +87,16 @@ Set-ExecutionPolicy Bypass -Scope Process
 .\agents\windows\install.ps1
 ```
 
-The script prompts for your server URL and a name for this computer, writes the config to `%APPDATA%\worktime-tracker\config.json`, registers the scheduled task, and runs an initial sync from January 1st of the current year to pull in historical data.
+The script prompts for your server URL and a name for this computer, writes the config to `%APPDATA%\worktime-tracker\config.json`, and registers the two scheduled tasks.
 
 **Check task status:**
 
 ```powershell
-Get-ScheduledTask -TaskName WorktimeTracker-Sync | Get-ScheduledTaskInfo
+Get-ScheduledTask -TaskName WorktimeTracker-Login  | Get-ScheduledTaskInfo
+Get-ScheduledTask -TaskName WorktimeTracker-Logout | Get-ScheduledTaskInfo
 ```
 
-**Admin account required:** The Security Event Log (which contains login/lock/unlock events) requires elevated access to read.
+**Admin required for install only:** The installer must run as Administrator to register Task Scheduler tasks. The tasks themselves run at `LeastPrivilege` — no elevated access at runtime.
 
 ---
 
