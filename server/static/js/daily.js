@@ -101,27 +101,34 @@ const Daily = (() => {
     if (!sessions.length && !manuals.length) return;
 
     const container = document.getElementById('sess-' + i);
-    const sessionRows = sessions.map((s, si) =>
-      '<div class="flex items-center gap-3 text-xs py-1 flex-wrap" id="sr-' + i + '-' + si + '">' +
-        '<span class="text-slate-400 shrink-0">' +
-          fmtTime(s.login_at) + ' – ' + (
-            s.logout_at
-              ? fmtTime(s.logout_at)
-              : (isPastDay
-                  ? '<span class="text-orange-400">never ended</span>'
-                  : '<span class="text-teal-500">active</span>')
-          ) +
-        '</span>' +
-        '<span class="text-slate-500 shrink-0 w-10">' + (s.is_active && isPastDay ? '—' : fmtH(s.duration_hours)) + '</span>' +
-        '<span class="text-slate-500 shrink-0">' + s.computer + '</span>' +
-        '<button class="sess-toggle px-2 py-0.5 rounded text-xs ' +
-          (s.is_work ? 'bg-teal-900 text-teal-300' : 'bg-slate-700 text-slate-400') + '" ' +
-          'data-ridx="' + i + '" data-sidx="' + si + '">' +
-          (s.is_work ? 'Work' : 'Non-work') +
-        '</button>' +
-        (s.note ? '<span class="text-slate-500">' + s.note + '</span>' : '') +
-      '</div>'
-    );
+    const sessionRows = sessions.map((s, si) => {
+      const badgeCls = 'sess-toggle px-2 py-0.5 rounded text-xs ' +
+        (s.is_work ? 'bg-teal-900 text-teal-300' : 'bg-slate-700 text-slate-400');
+      const badgeLabel = s.is_work ? 'Work' : 'Non-work';
+      const endTime = s.logout_at
+        ? fmtTime(s.logout_at)
+        : (isPastDay
+            ? '<span class="text-orange-400">never ended</span>'
+            : '<span class="text-teal-500">active</span>');
+      const dur = s.is_active && isPastDay ? '—' : fmtH(s.duration_hours);
+      return (
+        '<div class="py-1.5 text-xs border-b border-slate-800 last:border-0" id="sr-' + i + '-' + si + '">' +
+          '<div class="flex items-center gap-2">' +
+            '<span class="text-slate-400 shrink-0">' + fmtTime(s.login_at) + ' – ' + endTime + '</span>' +
+            '<span class="text-slate-500 shrink-0 w-10">' + dur + '</span>' +
+            '<span class="text-slate-500 shrink-0">' + s.computer + '</span>' +
+            '<button class="' + badgeCls + ' ml-auto hidden sm:inline-flex" data-ridx="' + i + '" data-sidx="' + si + '">' + badgeLabel + '</button>' +
+          '</div>' +
+          '<div class="mt-1 sm:hidden">' +
+            '<button class="' + badgeCls + '" data-ridx="' + i + '" data-sidx="' + si + '">' + badgeLabel + '</button>' +
+          '</div>' +
+          '<div class="mt-1">' +
+            '<input class="sess-note bg-transparent text-slate-400 text-xs w-full placeholder-slate-600 outline-none border-b border-transparent focus:border-slate-500 transition-colors" ' +
+              'data-ridx="' + i + '" data-sidx="' + si + '" placeholder="Add note…">' +
+          '</div>' +
+        '</div>'
+      );
+    });
     const manualRows = manuals.map(m =>
       '<div class="flex items-center gap-3 text-xs py-1 flex-wrap">' +
         '<span class="text-slate-400 shrink-0">manual</span>' +
@@ -131,6 +138,12 @@ const Daily = (() => {
       '</div>'
     );
     container.innerHTML = [...sessionRows, ...manualRows].join('');
+
+    // Set note values via DOM to avoid HTML-escaping issues
+    sessions.forEach((s, si) => {
+      const input = container.querySelector('.sess-note[data-ridx="' + i + '"][data-sidx="' + si + '"]');
+      if (input) input.value = s.note || '';
+    });
 
     container.querySelectorAll('.sess-toggle').forEach(btn => {
       btn.addEventListener('click', async e => {
@@ -142,15 +155,38 @@ const Daily = (() => {
         try {
           const updated = await api.patchSession(session.id, { is_work: newIsWork, note: session.note });
           session.is_work = updated.is_work;
-          btn.textContent = updated.is_work ? 'Work' : 'Non-work';
-          btn.className = 'sess-toggle px-2 py-0.5 rounded text-xs ' +
+          const newCls = 'sess-toggle px-2 py-0.5 rounded text-xs ' +
             (updated.is_work ? 'bg-teal-900 text-teal-300' : 'bg-slate-700 text-slate-400');
+          const newLabel = updated.is_work ? 'Work' : 'Non-work';
+          container.querySelectorAll('.sess-toggle[data-ridx="' + ri + '"][data-sidx="' + si + '"]').forEach(b => {
+            b.textContent = newLabel;
+            b.className = newCls;
+          });
           // Refresh chart since hours changed
           const daily = await api.getDailySummary(60);
           renderChart(daily);
         } catch (err) {
           console.error('Toggle error:', err);
         }
+      });
+    });
+
+    container.querySelectorAll('.sess-note').forEach(input => {
+      const si = parseInt(input.dataset.sidx);
+      const session = sessions[si]; // same sorted array used to render the rows
+      input.addEventListener('blur', async () => {
+        const newNote = input.value.trim() || null;
+        if (newNote === (session.note || null)) return;
+        try {
+          await api.patchSession(session.id, { is_work: session.is_work, note: newNote });
+          session.note = newNote;
+        } catch (err) {
+          console.error('Note error:', err);
+          input.value = session.note || '';
+        }
+      });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       });
     });
 
