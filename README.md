@@ -52,16 +52,22 @@ Open `http://localhost:8000` (or `http://<your-server-ip>:8000` from another mac
 
 **3. Set up daily backups:**
 
-Backups are kept for 30 days in `/var/lib/worktime-tracker/backups/`. Add a cron job to run the backup script nightly:
+Backups are kept for 30 days in `/var/lib/worktime-tracker/backups/`. From the repo directory, symlink the backup script into your PATH:
+
+```bash
+sudo ln -sf $(pwd)/scripts/backup.sh /usr/local/bin/worktime-backup
+```
+
+Then add a cron job to run it nightly:
 
 ```bash
 crontab -e
 ```
 
-Add this line (adjust the path to wherever you cloned the repo):
+Add this line:
 
 ```
-0 2 * * * /home/alan/git/worktime-tracker/scripts/backup.sh >> /var/log/worktime-backup.log 2>&1
+0 2 * * * /usr/local/bin/worktime-backup >> /var/log/worktime-backup.log 2>&1
 ```
 
 **To update:**
