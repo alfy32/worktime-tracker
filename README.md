@@ -31,7 +31,16 @@ The dashboard shows a live stop time based on how many hours you've worked this 
 
 ## Server Setup
 
-The server runs in Docker and exposes the web UI and API on port 8000.
+The server runs in Docker and exposes the web UI and API on port 8000. The database lives at `/var/lib/worktime-tracker/worktime.db` on the host — outside the repo and outside the container.
+
+**1. Create the data directory:**
+
+```bash
+sudo mkdir -p /var/lib/worktime-tracker
+sudo chown $USER:$USER /var/lib/worktime-tracker
+```
+
+**2. Clone and start:**
 
 ```bash
 git clone <repo>
@@ -41,7 +50,19 @@ docker compose up -d
 
 Open `http://localhost:8000` (or `http://<your-server-ip>:8000` from another machine on the network).
 
-SQLite data is stored in `./data/worktime.db` on the host — back it up with a simple cron job. Edit `docker-compose.yml` to change the data directory path if needed.
+**3. Set up daily backups:**
+
+Backups are kept for 30 days in `/var/lib/worktime-tracker/backups/`. Add a cron job to run the backup script nightly:
+
+```bash
+crontab -e
+```
+
+Add this line (adjust the path to wherever you cloned the repo):
+
+```
+0 2 * * * /home/alan/git/worktime-tracker/scripts/backup.sh >> /var/log/worktime-backup.log 2>&1
+```
 
 **To update:**
 
@@ -107,6 +128,6 @@ server/          FastAPI server + SQLite + web UI
 agents/
   ubuntu/        Ubuntu sync agent and lock listener
   windows/       Windows PowerShell sync agent and installer
-data/            SQLite database (created on first run)
+scripts/         Maintenance scripts (backup, etc.)
 tests/           Test suite (Python + PowerShell/Pester)
 ```

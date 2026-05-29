@@ -4,7 +4,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data   # host path — adjust on the home server to wherever you want the file
+      - /var/lib/worktime-tracker:/app/data
     environment:
       - DATABASE_URL=sqlite:////app/data/worktime.db
       - TZ=America/Denver

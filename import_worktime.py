@@ -129,6 +129,13 @@ def _iso_week_monday(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
+def _fmt_duration(td: timedelta) -> str:
+    total = int(td.total_seconds())
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
 def generate_markdown(result: dict, computer: str = "alan-windows") -> str:
     lines = ["# Worktime Import Preview", ""]
 
@@ -138,27 +145,34 @@ def generate_markdown(result: dict, computer: str = "alan-windows") -> str:
 
     for monday in sorted(weeks.keys()):
         week_days = weeks[monday]
-        week_total = sum(d["total_hours"] for d in week_days)
+        week_total = sum(
+            (s["logout"] - s["login"] for d in week_days for s in d["sessions"]),
+            timedelta(),
+        )
         lines.append(
-            f"## Week of Mon {monday.strftime('%Y-%m-%d')} — {week_total:.1f}h total"
+            f"## Week of Mon {monday.strftime('%Y-%m-%d')} — {_fmt_duration(week_total)} total"
         )
         lines.append("")
 
         for day in week_days:
             dow = day["date"].strftime("%a")
+            day_total = sum(
+                (s["logout"] - s["login"] for s in day["sessions"]), timedelta()
+            )
             lines.append(
-                f"### {dow} {day['date'].strftime('%Y-%m-%d')} — {day['total_hours']:.1f}h"
+                f"### {dow} {day['date'].strftime('%Y-%m-%d')} — {_fmt_duration(day_total)}"
             )
             lines.append("")
 
             if day["sessions"] or day["warnings"]:
-                lines.append("| Type | Start | End | Hours | Note |")
-                lines.append("|------|-------|-----|-------|------|")
+                lines.append("| Type | Start | End | Duration | Note |")
+                lines.append("|------|-------|-----|----------|------|")
                 for s in day["sessions"]:
-                    start = s["login"].strftime("%-I:%M %p")
-                    end = s["logout"].strftime("%-I:%M %p")
+                    start = s["login"].strftime("%-I:%M:%S %p")
+                    end = s["logout"].strftime("%-I:%M:%S %p")
+                    dur = _fmt_duration(s["logout"] - s["login"])
                     lines.append(
-                        f"| {s['type']} | {start} | {end} | {s['hours']:.1f}h | {s['note']} |"
+                        f"| {s['type']} | {start} | {end} | {dur} | {s['note']} |"
                     )
                 for w in day["warnings"]:
                     lines.append(f"| ⚠️ WARNING | {w} | | | |")
