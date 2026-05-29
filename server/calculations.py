@@ -4,7 +4,8 @@ from datetime import datetime, date, timedelta
 def get_sessions(events: list, now: datetime) -> list[tuple[datetime, datetime]]:
     """
     Pair login/logout events for a single computer into (start, end) tuples.
-    Non-work logins are excluded. An open login uses `now` as the end.
+    Non-work logins are excluded. An open login on today's date uses `now` as
+    the end; open logins on earlier dates are excluded (0 hours contributed).
     Input need not be pre-sorted.
     """
     sessions = []
