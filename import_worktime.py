@@ -123,3 +123,70 @@ def pair_and_classify(rows: list[dict]) -> dict:
         "manual_entries": manual_entries,
         "warnings": all_warnings,
     }
+
+
+def _iso_week_monday(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def generate_markdown(result: dict, computer: str = "alan-windows") -> str:
+    lines = ["# Worktime Import Preview", ""]
+
+    weeks: dict[date, list[dict]] = defaultdict(list)
+    for day in result["days"]:
+        weeks[_iso_week_monday(day["date"])].append(day)
+
+    for monday in sorted(weeks.keys()):
+        week_days = weeks[monday]
+        week_total = sum(d["total_hours"] for d in week_days)
+        lines.append(
+            f"## Week of Mon {monday.strftime('%Y-%m-%d')} — {week_total:.1f}h total"
+        )
+        lines.append("")
+
+        for day in week_days:
+            dow = day["date"].strftime("%a")
+            lines.append(
+                f"### {dow} {day['date'].strftime('%Y-%m-%d')} — {day['total_hours']:.1f}h"
+            )
+            lines.append("")
+
+            if day["sessions"] or day["warnings"]:
+                lines.append("| Type | Start | End | Hours | Note |")
+                lines.append("|------|-------|-----|-------|------|")
+                for s in day["sessions"]:
+                    start = s["login"].strftime("%-I:%M %p")
+                    end = s["logout"].strftime("%-I:%M %p")
+                    lines.append(
+                        f"| {s['type']} | {start} | {end} | {s['hours']:.1f}h | {s['note']} |"
+                    )
+                for w in day["warnings"]:
+                    lines.append(f"| ⚠️ WARNING | {w} | | | |")
+            else:
+                lines.append("| ⚠️ WARNING | no sessions | | | |")
+
+            lines.append("")
+
+    total_event_sessions = sum(len(b["events"]) // 2 for b in result["sync_batches"])
+    lines.append(
+        f"**Summary:** {len(result['days'])} days · "
+        f"{total_event_sessions} event sessions · "
+        f"{len(result['manual_entries'])} manual entries · "
+        f"{len(result['warnings'])} warnings"
+    )
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## Import Payload")
+    lines.append("")
+    payload = {
+        "computer": computer,
+        "sync_batches": result["sync_batches"],
+        "manual_entries": result["manual_entries"],
+        "warnings": result["warnings"],
+    }
+    lines.append("```json")
+    lines.append(json.dumps(payload, indent=2))
+    lines.append("```")
+
+    return "\n".join(lines)

@@ -153,3 +153,93 @@ def test_pair_classify_day_total():
     )
     result = pair_and_classify(rows)
     assert result["days"][0]["total_hours"] == pytest.approx(6.77, abs=0.02)
+
+
+# ---------------------------------------------------------------------------
+# generate_markdown
+# ---------------------------------------------------------------------------
+from import_worktime import generate_markdown
+
+
+def test_generate_markdown_week_header():
+    rows = make_rows(
+        ("2026-01-05", "08:00:00 AM", "login", ""),
+        ("2026-01-05", "04:00:00 PM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    md = generate_markdown(result)
+    assert "## Week of Mon 2026-01-05" in md
+    assert "8.0h total" in md
+
+
+def test_generate_markdown_day_header():
+    rows = make_rows(
+        ("2026-01-05", "08:00:00 AM", "login", ""),
+        ("2026-01-05", "04:00:00 PM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    md = generate_markdown(result)
+    assert "### Mon 2026-01-05" in md
+
+
+def test_generate_markdown_event_row():
+    rows = make_rows(
+        ("2026-01-02", "08:21:41 AM", "login", ""),
+        ("2026-01-02", "11:54:50 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    md = generate_markdown(result)
+    assert "| EVENT |" in md
+    assert "8:21 AM" in md
+    assert "11:54 AM" in md
+
+
+def test_generate_markdown_manual_row():
+    rows = make_rows(
+        ("2026-01-01", "12:00:00 AM", "login", "New Years Day"),
+        ("2026-01-01", "08:00:00 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    md = generate_markdown(result)
+    assert "| MANUAL |" in md
+    assert "New Years Day" in md
+
+
+def test_generate_markdown_warning_row():
+    rows = make_rows(
+        ("2026-01-05", "12:34:00 PM", "login", ""),
+    )
+    result = pair_and_classify(rows)
+    md = generate_markdown(result)
+    assert "⚠️ WARNING" in md
+
+
+def test_generate_markdown_import_payload():
+    rows = make_rows(
+        ("2026-01-02", "08:21:41 AM", "login", ""),
+        ("2026-01-02", "11:54:50 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    md = generate_markdown(result)
+    assert "## Import Payload" in md
+    assert "```json" in md
+    assert '"computer": "alan-windows"' in md
+    assert '"sync_batches"' in md
+    assert '"manual_entries"' in md
+
+
+def test_generate_markdown_payload_is_valid_json():
+    rows = make_rows(
+        ("2026-01-02", "08:21:41 AM", "login", ""),
+        ("2026-01-02", "11:54:50 AM", "logout", ""),
+        ("2026-01-01", "12:00:00 AM", "login", "New Years Day"),
+        ("2026-01-01", "08:00:00 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    md = generate_markdown(result)
+    start = md.index("```json\n") + len("```json\n")
+    end = md.index("\n```", start)
+    payload = json.loads(md[start:end])
+    assert "sync_batches" in payload
+    assert "manual_entries" in payload
+    assert payload["manual_entries"][0]["note"] == "New Years Day"
