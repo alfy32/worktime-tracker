@@ -94,7 +94,10 @@ const Daily = (() => {
     }
 
     const dateStr = rows[i].date;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const _td = new Date();
+    const todayStr = _td.getFullYear() + '-' +
+      String(_td.getMonth() + 1).padStart(2, '0') + '-' +
+      String(_td.getDate()).padStart(2, '0');
     const isPastDay = dateStr < todayStr;
     const sessions = sessionsForDate(dateStr).slice().sort((a, b) => new Date(a.login_at) - new Date(b.login_at));
     const manuals  = manualsForDate(dateStr);
