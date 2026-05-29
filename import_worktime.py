@@ -190,3 +190,38 @@ def generate_markdown(result: dict, computer: str = "alan-windows") -> str:
     lines.append("```")
 
     return "\n".join(lines)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate a worktime import preview from a CSV export"
+    )
+    parser.add_argument("csv_file", help="Path to the exported spreadsheet CSV")
+    parser.add_argument(
+        "--out",
+        default="import_preview.md",
+        help="Output Markdown file (default: import_preview.md)",
+    )
+    args = parser.parse_args()
+
+    rows = parse_csv(args.csv_file)
+    if not rows:
+        print("No rows parsed — check that the CSV path is correct and the format matches.", file=sys.stderr)
+        sys.exit(1)
+
+    result = pair_and_classify(rows)
+    markdown = generate_markdown(result)
+
+    with open(args.out, "w") as f:
+        f.write(markdown)
+
+    total_event_sessions = sum(len(b["events"]) // 2 for b in result["sync_batches"])
+    print(f"Preview written to {args.out}")
+    print(f"  {len(result['days'])} days")
+    print(f"  {total_event_sessions} event sessions")
+    print(f"  {len(result['manual_entries'])} manual entries")
+    print(f"  {len(result['warnings'])} warnings")
+
+
+if __name__ == "__main__":
+    main()
