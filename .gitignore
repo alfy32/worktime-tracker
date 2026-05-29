@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .superpowers/
+.claude/
+import_preview.md
