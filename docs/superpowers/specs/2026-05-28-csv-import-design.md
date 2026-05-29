@@ -46,79 +46,98 @@ Within each day, walk the rows in order and pair each `login` with the next `log
 
 ---
 
-## Preview Output Format
+## Output: Markdown Review Document
 
-Grouped by week, then by day. Run with no flags or `--preview`.
+The script writes a single Markdown file (`import_preview.md`) with two sections.
 
+### Section 1 — Human-readable preview
+
+Grouped by week, then by day:
+
+````markdown
+## Week of Mon 2025-12-29 — 38.5h total
+
+### Thu 2026-01-01 — 8.0h
+| Type | Start | End | Hours | Note |
+|------|-------|-----|-------|------|
+| MANUAL | 12:00 AM | 8:00 AM | 8.0h | New Years Day |
+
+### Fri 2026-01-02 — 6.8h
+| Type | Start | End | Hours | Note |
+|------|-------|-----|-------|------|
+| EVENT | 8:21 AM | 11:54 AM | 3.6h | |
+| EVENT | 1:01 PM | 4:14 PM | 3.2h | |
+
+### Mon 2026-01-05 — 7.8h
+| Type | Start | End | Hours | Note |
+|------|-------|-----|-------|------|
+| EVENT | 7:44 AM | 11:53 AM | 4.1h | |
+| EVENT | 12:31 PM | 1:24 PM | 0.9h | |
+| EVENT | 1:24 PM | 4:11 PM | 2.8h | |
+| ⚠️ WARNING | unpaired login at 12:34 PM — no matching logout | | | |
+
+### Sat 2026-01-10 — 0.0h
+| ⚠️ WARNING | no sessions | | | |
+````
+
+- Week headers (`##`) show the Monday that starts the ISO week and the total hours.
+- Day headers (`###`) show the three-letter weekday, date, and total hours for the day.
+- Tables show one row per session or warning.
+- `MANUAL` rows include the comment in the Note column.
+- `⚠️ WARNING` rows flag anomalies: unpaired events, unexpected data shapes.
+
+### Section 2 — Import payload
+
+At the end of the file, a fenced JSON block containing the full structured import data, ready to POST:
+
+````markdown
+## Import Payload
+
+```json
+{
+  "computer": "alan-windows",
+  "sync_batches": [
+    {
+      "date": "2026-01-02",
+      "events": [
+        {"timestamp": "2026-01-02T08:21:41", "action": "login"},
+        {"timestamp": "2026-01-02T11:54:50", "action": "logout"},
+        {"timestamp": "2026-01-02T13:01:05", "action": "login"},
+        {"timestamp": "2026-01-02T16:14:02", "action": "logout"}
+      ]
+    }
+  ],
+  "manual_entries": [
+    {"date": "2026-01-01", "hours": 8.0, "note": "New Years Day"}
+  ],
+  "warnings": [
+    "2026-01-05: unpaired login at 12:34 PM — no matching logout"
+  ]
+}
 ```
-╔══ Week of Mon 2025-12-29  (38.5h total) ══════════════════╗
+````
 
-  Thu 2026-01-01  (8.0h)
-    MANUAL  12:00 AM → 8:00 AM  (8.0h)  "New Years Day"
-
-  Fri 2026-01-02  (6.8h)
-    EVENT   8:21 AM → 11:54 AM  (3.6h)
-    EVENT   1:01 PM → 4:14 PM   (3.2h)
-
-╔══ Week of Mon 2026-01-05  (32.1h total) ══════════════════╗
-
-  Mon 2026-01-05  (7.8h)
-    EVENT   7:44 AM → 11:53 AM  (4.1h)
-    EVENT   12:31 PM → 1:24 PM  (0.9h)
-    EVENT   1:24 PM → 4:11 PM   (2.8h)
-    WARNING unpaired login at 12:34 PM — no matching logout
-
-  Sat 2026-01-10  (0.0h)
-    WARNING no sessions
-```
-
-- Week header shows the Monday that starts the ISO week and the sum of all session hours that week.
-- Day header shows three-letter weekday name, date, and total hours for that day.
-- `MANUAL` lines show time range, duration, and the comment in quotes.
-- `EVENT` lines show time range and duration.
-- `WARNING` lines flag anomalies — unpaired events, weekend days with data, etc.
-- A summary line at the end: total days, total events, total manual entries, total warnings.
-
----
-
-## Import Mode
-
-Run with `--import`. For each classified entry:
-
-- **EVENT pairs** → batched per-day and POSTed to `POST /api/sync`:
-  ```json
-  {
-    "computer": "alan-windows",
-    "events": [
-      {"timestamp": "2026-01-02T08:21:41", "action": "login"},
-      {"timestamp": "2026-01-02T11:54:50", "action": "logout"}
-    ]
-  }
-  ```
-  The server upserts on `(computer, timestamp, action)` — safe to re-run.
-
-- **MANUAL entries** → POSTed to `POST /api/manual`:
-  ```json
-  {"date": "2026-01-01", "hours": 8.0, "note": "New Years Day"}
-  ```
-
-- Warnings are printed but not imported.
-
-After import, prints a summary: events inserted/skipped, manual entries created.
+Warnings are included in the payload for reference but are never POSTed. When importing, the script reads this JSON block and sends:
+- Each `sync_batches` entry to `POST /api/sync`
+- Each `manual_entries` entry to `POST /api/manual`
 
 ---
 
 ## CLI Interface
 
 ```
-python import_worktime.py <csv_file> [--import] [--server http://localhost:8000]
+python import_worktime.py <csv_file> [--out import_preview.md]
 ```
 
-| Flag       | Default                    | Purpose                        |
-|------------|----------------------------|--------------------------------|
-| `csv_file` | (required)                 | Path to the exported CSV       |
-| `--import` | off (preview mode default) | Actually POST to the API       |
-| `--server` | `http://localhost:8000`    | Base URL of the worktime server|
+| Flag       | Default               | Purpose                          |
+|------------|-----------------------|----------------------------------|
+| `csv_file` | (required)            | Path to the exported CSV         |
+| `--out`    | `import_preview.md`   | Path to write the Markdown output|
+
+There is no `--import` flag. The workflow is:
+1. Run the script to generate `import_preview.md`
+2. Review the Markdown
+3. Claude reads the Import Payload JSON block and POSTs directly to the server
 
 ---
 
