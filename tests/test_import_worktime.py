@@ -62,3 +62,94 @@ def test_parse_csv_skips_short_rows(tmp_path):
     """)
     rows = parse_csv(path)
     assert len(rows) == 1
+
+
+# ---------------------------------------------------------------------------
+# pair_and_classify
+# ---------------------------------------------------------------------------
+from import_worktime import pair_and_classify
+
+
+def make_rows(*specs):
+    """specs: (date_str, time_str, action, comment) tuples"""
+    rows = []
+    for date_str, time_str, action, comment in specs:
+        ts = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %I:%M:%S %p")
+        rows.append({"timestamp": ts, "action": action, "comment": comment})
+    return sorted(rows, key=lambda r: r["timestamp"])
+
+
+def test_pair_classify_event_pair():
+    rows = make_rows(
+        ("2026-01-02", "08:21:41 AM", "login", ""),
+        ("2026-01-02", "11:54:50 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    assert len(result["days"]) == 1
+    day = result["days"][0]
+    assert len(day["sessions"]) == 1
+    assert day["sessions"][0]["type"] == "EVENT"
+    assert day["sessions"][0]["hours"] == pytest.approx(3.55, abs=0.01)
+    assert len(result["sync_batches"]) == 1
+    assert len(result["manual_entries"]) == 0
+
+
+def test_pair_classify_manual_entry():
+    rows = make_rows(
+        ("2026-01-01", "12:00:00 AM", "login", "New Years Day"),
+        ("2026-01-01", "08:00:00 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    day = result["days"][0]
+    assert day["sessions"][0]["type"] == "MANUAL"
+    assert day["sessions"][0]["note"] == "New Years Day"
+    assert day["sessions"][0]["hours"] == pytest.approx(8.0, abs=0.01)
+    assert len(result["manual_entries"]) == 1
+    assert result["manual_entries"][0]["note"] == "New Years Day"
+    assert len(result["sync_batches"]) == 0
+
+
+def test_pair_classify_unpaired_login():
+    rows = make_rows(
+        ("2026-01-05", "07:44:05 AM", "login", ""),
+        ("2026-01-05", "11:53:09 AM", "logout", ""),
+        ("2026-01-05", "12:34:00 PM", "login", ""),
+    )
+    result = pair_and_classify(rows)
+    day = result["days"][0]
+    assert len(day["sessions"]) == 1
+    assert len(day["warnings"]) == 1
+    assert "unpaired login" in day["warnings"][0]
+
+
+def test_pair_classify_unpaired_logout():
+    rows = make_rows(
+        ("2026-01-05", "11:53:09 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    day = result["days"][0]
+    assert len(day["warnings"]) == 1
+    assert "unpaired logout" in day["warnings"][0]
+
+
+def test_pair_classify_multiple_days():
+    rows = make_rows(
+        ("2026-01-02", "08:21:41 AM", "login", ""),
+        ("2026-01-02", "11:54:50 AM", "logout", ""),
+        ("2026-01-05", "07:44:05 AM", "login", ""),
+        ("2026-01-05", "11:53:09 AM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    assert len(result["days"]) == 2
+    assert len(result["sync_batches"]) == 2
+
+
+def test_pair_classify_day_total():
+    rows = make_rows(
+        ("2026-01-02", "08:21:41 AM", "login", ""),
+        ("2026-01-02", "11:54:50 AM", "logout", ""),
+        ("2026-01-02", "01:01:05 PM", "login", ""),
+        ("2026-01-02", "04:14:02 PM", "logout", ""),
+    )
+    result = pair_and_classify(rows)
+    assert result["days"][0]["total_hours"] == pytest.approx(6.77, abs=0.02)
