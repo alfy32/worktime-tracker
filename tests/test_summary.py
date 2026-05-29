@@ -112,3 +112,43 @@ def test_weekly_summary(client):
     assert len(data["weeks"]) == 4
     current_week = data["weeks"][-1]
     assert current_week["total_hours"] == pytest.approx(8.0)
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_daily_invalid_flag_set_for_past_open_session(client):
+    # May 18: one closed session (8–12) + one unclosed login (13:00, no logout)
+    # Expected: is_invalid=True, hours=4.0 (only the closed session counts)
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-18T08:00:00", "action": "login"},
+        {"timestamp": "2026-05-18T12:00:00", "action": "logout"},
+        {"timestamp": "2026-05-18T13:00:00", "action": "login"},
+    ])
+    resp = client.get("/api/summary/daily?days=5")
+    assert resp.status_code == 200
+    may18 = next(d for d in resp.json()["days"] if d["date"] == "2026-05-18")
+    assert may18["is_invalid"] is True
+    assert may18["hours"] == pytest.approx(4.0)
+    assert may18["session_count"] == 1  # unclosed session is not counted
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_daily_invalid_flag_false_when_all_sessions_closed(client):
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-18T09:00:00", "action": "login"},
+        {"timestamp": "2026-05-18T17:00:00", "action": "logout"},
+    ])
+    resp = client.get("/api/summary/daily?days=5")
+    may18 = next(d for d in resp.json()["days"] if d["date"] == "2026-05-18")
+    assert may18["is_invalid"] is False
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_daily_invalid_flag_false_for_today_open_session(client):
+    # Today's open session is active — not invalid
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-20T09:00:00", "action": "login"},
+    ])
+    resp = client.get("/api/summary/daily?days=2")
+    today = next(d for d in resp.json()["days"] if d["date"] == "2026-05-20")
+    assert today["is_invalid"] is False
+    assert today["hours"] == pytest.approx(5.0)  # 09:00–14:00 = 5h

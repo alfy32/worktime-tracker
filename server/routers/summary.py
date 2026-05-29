@@ -12,6 +12,7 @@ from calculations import (
     calculate_work_hours, calculate_per_computer_hours,
     calculate_hours_bank, calculate_stop_time,
     get_sessions, merge_intervals, remaining_weekdays_in_week, weekdays_elapsed,
+    has_unclosed_login,
 )
 from session_utils import build_sessions
 
@@ -199,11 +200,13 @@ def summary_daily(days: int = 60, db: Session = Depends(get_db)):
             len(get_sessions([e for e in d_events if e.computer == c], cutoff))
             for c in {e.computer for e in d_events}
         )
+        is_invalid = (d < today) and has_unclosed_login(d_events)
         result.append(DayStats(
             date=d,
             hours=round(hours, 2),
             session_count=sessions_count,
             longest_break_hours=_longest_break(d_events, cutoff),
+            is_invalid=is_invalid,
         ))
     return DailySummary(days=result)
 

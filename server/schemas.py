@@ -68,6 +68,7 @@ class DayStats(BaseModel):
     hours: float
     session_count: int
     longest_break_hours: float
+    is_invalid: bool = False
 
 
 class DailySummary(BaseModel):
