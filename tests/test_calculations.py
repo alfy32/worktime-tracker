@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, date, timedelta
 from calculations import get_sessions, merge_intervals, calculate_work_hours, calculate_per_computer_hours
 from calculations import weekdays_elapsed, calculate_hours_bank, remaining_weekdays_in_week, calculate_stop_time
+from calculations import has_unclosed_login
 
 
 def ev(computer, action, ts, is_work=True):
@@ -323,3 +324,37 @@ class TestStopTime:
             today_events=[], today_manual=[],
             bank_at_week_start=0.0, weekly_target=40.0, now=now,
         ) is None
+
+
+class TestHasUnclosedLogin:
+    def test_single_unclosed_login(self):
+        events = [ev("ubuntu", "login", datetime(2026, 5, 20, 8, 0))]
+        assert has_unclosed_login(events) is True
+
+    def test_closed_session_returns_false(self):
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 8, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 12, 0)),
+        ]
+        assert has_unclosed_login(events) is False
+
+    def test_empty_events_returns_false(self):
+        assert has_unclosed_login([]) is False
+
+    def test_one_computer_closed_one_unclosed(self):
+        events = [
+            ev("ubuntu",  "login",  datetime(2026, 5, 20, 8, 0)),
+            ev("ubuntu",  "logout", datetime(2026, 5, 20, 12, 0)),
+            ev("windows", "login",  datetime(2026, 5, 20, 9, 0)),
+            # windows has no logout
+        ]
+        assert has_unclosed_login(events) is True
+
+    def test_multiple_sessions_all_closed(self):
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 8, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 12, 0)),
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 13, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 17, 0)),
+        ]
+        assert has_unclosed_login(events) is False

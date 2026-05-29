@@ -28,6 +28,24 @@ def get_sessions(events: list, now: datetime) -> list[tuple[datetime, datetime]]
     return sessions
 
 
+def has_unclosed_login(events: list) -> bool:
+    """Return True if any computer in events has a login with no matching logout."""
+    for computer in {e.computer for e in events}:
+        comp_events = sorted(
+            [e for e in events if e.computer == computer],
+            key=lambda e: e.timestamp,
+        )
+        pending = False
+        for ev in comp_events:
+            if ev.action == "login":
+                pending = True
+            elif ev.action == "logout" and pending:
+                pending = False
+        if pending:
+            return True
+    return False
+
+
 def merge_intervals(
     intervals: list[tuple[datetime, datetime]],
 ) -> list[tuple[datetime, datetime]]:
