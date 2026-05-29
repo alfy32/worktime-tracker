@@ -21,7 +21,8 @@ def get_sessions(events: list, now: datetime) -> list[tuple[datetime, datetime]]
             pending_login = None
 
     if pending_login is not None and pending_is_work:
-        sessions.append((pending_login, now))
+        if pending_login.date() >= now.date():
+            sessions.append((pending_login, now))
 
     return sessions
 

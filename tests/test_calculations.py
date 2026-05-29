@@ -91,6 +91,17 @@ class TestGetSessions:
             (datetime(2026, 5, 20, 9, 0), datetime(2026, 5, 20, 12, 0))
         ]
 
+    def test_past_unclosed_login_excluded(self):
+        # Login on May 20, but now is May 21 → no session (would have been invalid)
+        later_now = datetime(2026, 5, 21, 14, 0)
+        events = [ev("ubuntu", "login", datetime(2026, 5, 20, 8, 0))]
+        assert get_sessions(events, later_now) == []
+
+    def test_today_open_session_still_included(self):
+        # Login and now are on the same date → session still counted (currently active)
+        events = [ev("ubuntu", "login", datetime(2026, 5, 20, 8, 0))]
+        assert get_sessions(events, NOW) == [(datetime(2026, 5, 20, 8, 0), NOW)]
+
 
 class TestMergeIntervals:
     def test_empty(self):
