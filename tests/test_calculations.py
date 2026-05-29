@@ -358,3 +358,8 @@ class TestHasUnclosedLogin:
             ev("ubuntu", "logout", datetime(2026, 5, 20, 17, 0)),
         ]
         assert has_unclosed_login(events) is False
+
+    def test_non_work_unclosed_login_not_flagged(self):
+        # Non-work open session should not trigger is_invalid — only work sessions matter
+        events = [ev("ubuntu", "login", datetime(2026, 5, 20, 8, 0), is_work=False)]
+        assert has_unclosed_login(events) is False

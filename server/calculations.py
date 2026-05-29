@@ -37,7 +37,7 @@ def has_unclosed_login(events: list) -> bool:
         )
         pending = False
         for ev in comp_events:
-            if ev.action == "login":
+            if ev.action == "login" and ev.is_work:
                 pending = True
             elif ev.action == "logout" and pending:
                 pending = False
