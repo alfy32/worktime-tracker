@@ -152,3 +152,25 @@ def test_daily_invalid_flag_false_for_today_open_session(client):
     today = next(d for d in resp.json()["days"] if d["date"] == "2026-05-20")
     assert today["is_invalid"] is False
     assert today["hours"] == pytest.approx(5.0)  # 09:00–14:00 = 5h
+
+
+@freeze_time("2026-05-21 14:00:00")
+def test_cross_day_session_counts_in_both_daily_and_weekly(client):
+    # Login May 19 at 23:00, logout May 20 at 01:00 = 2h cross-midnight session.
+    # Daily May 19 should count login-to-midnight (1h).
+    # Weekly should count the full 2h.
+    # Neither day should be flagged is_invalid (the session IS closed).
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-19T23:00:00", "action": "login"},
+        {"timestamp": "2026-05-20T01:00:00", "action": "logout"},
+    ])
+    daily_resp = client.get("/api/summary/daily?days=5")
+    may19 = next(d for d in daily_resp.json()["days"] if d["date"] == "2026-05-19")
+    may20 = next(d for d in daily_resp.json()["days"] if d["date"] == "2026-05-20")
+    assert may19["is_invalid"] is False
+    assert may19["hours"] == pytest.approx(1.0)   # 23:00–00:00
+    assert may20["hours"] == pytest.approx(0.0)   # orphan logout, no contribution
+
+    weekly_resp = client.get("/api/summary/weekly?weeks=2")
+    week_of_may18 = next(w for w in weekly_resp.json()["weeks"] if w["week_start"] == "2026-05-18")
+    assert week_of_may18["total_hours"] == pytest.approx(2.0)  # full session

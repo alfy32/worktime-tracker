@@ -4,8 +4,7 @@ from datetime import datetime, date, timedelta
 def get_sessions(events: list, now: datetime) -> list[tuple[datetime, datetime]]:
     """
     Pair login/logout events for a single computer into (start, end) tuples.
-    Non-work logins are excluded. An open login on today's date uses `now` as
-    the end; open logins on earlier dates are excluded (0 hours contributed).
+    Non-work logins are excluded. An open login uses `now` as the end.
     Input need not be pre-sorted.
     """
     sessions = []
@@ -22,10 +21,35 @@ def get_sessions(events: list, now: datetime) -> list[tuple[datetime, datetime]]
             pending_login = None
 
     if pending_login is not None and pending_is_work:
-        if pending_login.date() >= now.date():
-            sessions.append((pending_login, now))
+        sessions.append((pending_login, now))
 
     return sessions
+
+
+def find_unclosed_login_ids(all_events: list, today: date) -> set:
+    """
+    Return the set of event IDs for work login events that have no subsequent
+    logout anywhere in all_events, and whose date is before today.
+
+    Today's active session is intentionally excluded — it's a valid open session.
+    Cross-day sessions (login yesterday, logout today) are also excluded because
+    the login will eventually be paired with its logout.
+    """
+    result = set()
+    for computer in {e.computer for e in all_events}:
+        comp_events = sorted(
+            [e for e in all_events if e.computer == computer],
+            key=lambda e: e.timestamp,
+        )
+        pending = None
+        for ev in comp_events:
+            if ev.action == "login" and ev.is_work:
+                pending = ev
+            elif ev.action == "logout" and pending is not None:
+                pending = None
+        if pending is not None and pending.timestamp.date() < today:
+            result.add(pending.id)
+    return result
 
 
 def has_unclosed_login(events: list) -> bool:

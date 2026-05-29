@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, date, timedelta
 from calculations import get_sessions, merge_intervals, calculate_work_hours, calculate_per_computer_hours
 from calculations import weekdays_elapsed, calculate_hours_bank, remaining_weekdays_in_week, calculate_stop_time
-from calculations import has_unclosed_login
+from calculations import has_unclosed_login, find_unclosed_login_ids
 
 
 def ev(computer, action, ts, is_work=True):
@@ -92,16 +92,14 @@ class TestGetSessions:
             (datetime(2026, 5, 20, 9, 0), datetime(2026, 5, 20, 12, 0))
         ]
 
-    def test_past_unclosed_login_excluded(self):
-        # Login on May 20, but now is May 21 → no session (would have been invalid)
+    def test_open_session_on_past_day_uses_now(self):
+        # get_sessions always caps open sessions at now regardless of date.
+        # Callers filter truly-unclosed logins separately via find_unclosed_login_ids.
         later_now = datetime(2026, 5, 21, 14, 0)
         events = [ev("ubuntu", "login", datetime(2026, 5, 20, 8, 0))]
-        assert get_sessions(events, later_now) == []
-
-    def test_today_open_session_still_included(self):
-        # Login and now are on the same date → session still counted (currently active)
-        events = [ev("ubuntu", "login", datetime(2026, 5, 20, 8, 0))]
-        assert get_sessions(events, NOW) == [(datetime(2026, 5, 20, 8, 0), NOW)]
+        assert get_sessions(events, later_now) == [
+            (datetime(2026, 5, 20, 8, 0), later_now)
+        ]
 
 
 class TestMergeIntervals:
@@ -363,3 +361,39 @@ class TestHasUnclosedLogin:
         # Non-work open session should not trigger is_invalid — only work sessions matter
         events = [ev("ubuntu", "login", datetime(2026, 5, 20, 8, 0), is_work=False)]
         assert has_unclosed_login(events) is False
+
+
+class TestFindUnclosedLoginIds:
+    """find_unclosed_login_ids returns IDs of past work logins with no logout anywhere."""
+
+    def _ev_with_id(self, id_, computer, action, ts, is_work=True):
+        e = ev(computer, action, ts, is_work)
+        e.id = id_
+        return e
+
+    def test_past_truly_unclosed_returned(self):
+        today = date(2026, 5, 21)
+        events = [self._ev_with_id(1, "ubuntu", "login", datetime(2026, 5, 20, 8, 0))]
+        assert find_unclosed_login_ids(events, today) == {1}
+
+    def test_today_active_session_not_returned(self):
+        today = date(2026, 5, 20)
+        events = [self._ev_with_id(1, "ubuntu", "login", datetime(2026, 5, 20, 8, 0))]
+        assert find_unclosed_login_ids(events, today) == set()
+
+    def test_cross_day_session_not_returned(self):
+        # Login May 20, logout May 21 — login has a logout, so not unclosed
+        today = date(2026, 5, 22)
+        events = [
+            self._ev_with_id(1, "ubuntu", "login",  datetime(2026, 5, 20, 23, 0)),
+            self._ev_with_id(2, "ubuntu", "logout", datetime(2026, 5, 21, 1, 0)),
+        ]
+        assert find_unclosed_login_ids(events, today) == set()
+
+    def test_non_work_unclosed_not_returned(self):
+        today = date(2026, 5, 21)
+        events = [self._ev_with_id(1, "ubuntu", "login", datetime(2026, 5, 20, 8, 0), is_work=False)]
+        assert find_unclosed_login_ids(events, today) == set()
+
+    def test_empty_events(self):
+        assert find_unclosed_login_ids([], date(2026, 5, 21)) == set()
