@@ -61,7 +61,10 @@ const Daily = (() => {
         '<tr class="border-b border-slate-700 hover:bg-slate-700 cursor-pointer select-none" data-ridx="' + i + '">' +
           '<td class="p-4 text-slate-500 text-lg leading-none">' + (expandable ? '›' : '') + '</td>' +
           '<td class="p-4 font-medium">'  + fmtDate(d.date) + '</td>' +
-          '<td class="p-4 text-right font-semibold ' + color + '">' + (d.hours > 0 ? fmtH(d.hours) : '—') + '</td>' +
+          '<td class="p-4 text-right font-semibold ' + color + '">' +
+            (d.is_invalid ? '<span class="text-orange-400 mr-1" title="One or more sessions never ended">⚠</span>' : '') +
+            (d.hours > 0 ? fmtH(d.hours) : '—') +
+          '</td>' +
           '<td class="p-4 text-right text-slate-400 hidden sm:table-cell">' + d.session_count + '</td>' +
           '<td class="p-4 text-right text-slate-400 hidden md:table-cell">' + (d.longest_break_hours > 0 ? fmtH(d.longest_break_hours) : '—') + '</td>' +
         '</tr>' +
