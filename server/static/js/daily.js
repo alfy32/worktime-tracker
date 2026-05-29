@@ -1,5 +1,6 @@
 const Daily = (() => {
   let _sessions = [];   // all sessions fetched once, filtered in JS
+  let _manuals  = [];   // all manual entries fetched once
 
   function fmtH(h) { return Charts.fmtH(h); }
 
@@ -16,13 +17,19 @@ const Daily = (() => {
     return _sessions.filter(s => s.login_at.startsWith(dateStr));
   }
 
+  function manualsForDate(dateStr) {
+    return _manuals.filter(m => m.date === dateStr);
+  }
+
   async function load() {
     try {
-      const [daily, sessResp] = await Promise.all([
+      const [daily, sessResp, manuals] = await Promise.all([
         api.getDailySummary(60),
         api.getSessions(1, 5000),
+        api.getManualEntries(),
       ]);
       _sessions = sessResp.sessions;
+      _manuals  = manuals;
       renderChart(daily);
       renderTable(daily);
     } catch (e) {
@@ -45,12 +52,14 @@ const Daily = (() => {
 
     tbody.innerHTML = rows.map((d, i) => {
       const hasSessions = sessionsForDate(d.date).length > 0;
+      const hasManuals  = manualsForDate(d.date).length > 0;
+      const expandable  = hasSessions || hasManuals;
       const color = d.hours >= 8 ? 'text-teal-400'
                   : d.hours > 0  ? 'text-orange-400'
                   : 'text-slate-600';
       return (
         '<tr class="border-b border-slate-700 hover:bg-slate-700 cursor-pointer select-none" data-ridx="' + i + '">' +
-          '<td class="p-4 text-slate-500 text-lg leading-none">' + (hasSessions ? '›' : '') + '</td>' +
+          '<td class="p-4 text-slate-500 text-lg leading-none">' + (expandable ? '›' : '') + '</td>' +
           '<td class="p-4 font-medium">'  + fmtDate(d.date) + '</td>' +
           '<td class="p-4 text-right font-semibold ' + color + '">' + (d.hours > 0 ? fmtH(d.hours) : '—') + '</td>' +
           '<td class="p-4 text-right text-slate-400 hidden sm:table-cell">' + d.session_count + '</td>' +
@@ -83,10 +92,11 @@ const Daily = (() => {
 
     const dateStr = rows[i].date;
     const sessions = sessionsForDate(dateStr).slice().sort((a, b) => new Date(a.login_at) - new Date(b.login_at));
-    if (!sessions.length) return;
+    const manuals  = manualsForDate(dateStr);
+    if (!sessions.length && !manuals.length) return;
 
     const container = document.getElementById('sess-' + i);
-    container.innerHTML = sessions.map((s, si) =>
+    const sessionRows = sessions.map((s, si) =>
       '<div class="flex items-center gap-3 text-xs py-1 flex-wrap" id="sr-' + i + '-' + si + '">' +
         '<span class="text-slate-400 shrink-0">' +
           fmtTime(s.login_at) + ' – ' + (s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>') +
@@ -100,7 +110,16 @@ const Daily = (() => {
         '</button>' +
         (s.note ? '<span class="text-slate-500">' + s.note + '</span>' : '') +
       '</div>'
-    ).join('');
+    );
+    const manualRows = manuals.map(m =>
+      '<div class="flex items-center gap-3 text-xs py-1 flex-wrap">' +
+        '<span class="text-slate-400 shrink-0">manual</span>' +
+        '<span class="text-slate-500 shrink-0 w-10">' + fmtH(m.hours) + '</span>' +
+        '<span class="px-2 py-0.5 rounded bg-slate-700 text-slate-400">Manual</span>' +
+        (m.note ? '<span class="text-slate-500">' + m.note + '</span>' : '') +
+      '</div>'
+    );
+    container.innerHTML = [...sessionRows, ...manualRows].join('');
 
     container.querySelectorAll('.sess-toggle').forEach(btn => {
       btn.addEventListener('click', async e => {
