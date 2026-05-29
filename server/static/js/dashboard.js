@@ -123,17 +123,23 @@ const Dashboard = (() => {
       const start   = fmtTime(s.login_at);
       const end     = s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>';
       const workCls = s.is_work ? 'bg-teal-900 text-teal-300' : 'bg-slate-700 text-slate-400';
+      const badgeLabel = s.is_work ? 'Work' : 'Non-work';
       return (
-        '<div class="border-t border-slate-700">' +
-          '<div class="flex items-center gap-3 px-4 py-3 text-sm flex-wrap">' +
+        '<div class="border-t border-slate-700 px-4 pt-3 pb-3">' +
+          '<div class="flex items-center gap-3 text-sm">' +
             '<span class="text-slate-300 tabular-nums shrink-0">' + start + ' – ' + end + '</span>' +
             '<span class="text-teal-400 font-medium shrink-0">' + fmtH(s.duration_hours) + '</span>' +
             '<span class="text-slate-500 text-xs shrink-0">' + s.computer + '</span>' +
-            '<button class="ds-work-toggle ml-auto text-xs px-2 py-0.5 rounded ' + workCls + '" data-idx="' + idx + '">' +
-              (s.is_work ? 'Work' : 'Non-work') +
+            '<button class="ds-work-toggle ml-auto text-xs px-2 py-0.5 rounded hidden sm:inline-flex ' + workCls + '" data-idx="' + idx + '">' +
+              badgeLabel +
             '</button>' +
           '</div>' +
-          '<div class="px-4 pb-3">' +
+          '<div class="mt-1.5 sm:hidden">' +
+            '<button class="ds-work-toggle text-xs px-2 py-0.5 rounded ' + workCls + '" data-idx="' + idx + '">' +
+              badgeLabel +
+            '</button>' +
+          '</div>' +
+          '<div class="mt-1.5">' +
             '<input class="ds-note bg-transparent text-slate-400 text-xs w-full placeholder-slate-600 outline-none border-b border-transparent focus:border-slate-500 transition-colors" ' +
               'data-idx="' + idx + '" placeholder="Add note…">' +
           '</div>' +
