@@ -150,7 +150,7 @@ const Daily = (() => {
         e.stopPropagation();
         const ri = parseInt(btn.dataset.ridx);
         const si = parseInt(btn.dataset.sidx);
-        const session = sessionsForDate(rows[ri].date)[si];
+        const session = sessions[si];
         const newIsWork = !session.is_work;
         try {
           const updated = await api.patchSession(session.id, { is_work: newIsWork, note: session.note });
