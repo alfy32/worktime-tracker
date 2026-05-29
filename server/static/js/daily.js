@@ -94,6 +94,8 @@ const Daily = (() => {
     }
 
     const dateStr = rows[i].date;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isPastDay = dateStr < todayStr;
     const sessions = sessionsForDate(dateStr).slice().sort((a, b) => new Date(a.login_at) - new Date(b.login_at));
     const manuals  = manualsForDate(dateStr);
     if (!sessions.length && !manuals.length) return;
@@ -102,9 +104,15 @@ const Daily = (() => {
     const sessionRows = sessions.map((s, si) =>
       '<div class="flex items-center gap-3 text-xs py-1 flex-wrap" id="sr-' + i + '-' + si + '">' +
         '<span class="text-slate-400 shrink-0">' +
-          fmtTime(s.login_at) + ' – ' + (s.logout_at ? fmtTime(s.logout_at) : '<span class="text-teal-500">active</span>') +
+          fmtTime(s.login_at) + ' – ' + (
+            s.logout_at
+              ? fmtTime(s.logout_at)
+              : (isPastDay
+                  ? '<span class="text-orange-400">never ended</span>'
+                  : '<span class="text-teal-500">active</span>')
+          ) +
         '</span>' +
-        '<span class="text-slate-500 shrink-0 w-10">' + fmtH(s.duration_hours) + '</span>' +
+        '<span class="text-slate-500 shrink-0 w-10">' + (s.is_active && isPastDay ? '—' : fmtH(s.duration_hours)) + '</span>' +
         '<span class="text-slate-500 shrink-0">' + s.computer + '</span>' +
         '<button class="sess-toggle px-2 py-0.5 rounded text-xs ' +
           (s.is_work ? 'bg-teal-900 text-teal-300' : 'bg-slate-700 text-slate-400') + '" ' +
