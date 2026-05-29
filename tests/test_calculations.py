@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, date, timedelta
 from calculations import get_sessions, merge_intervals, calculate_work_hours, calculate_per_computer_hours
 from calculations import weekdays_elapsed, calculate_hours_bank, remaining_weekdays_in_week, calculate_stop_time
-from calculations import has_unclosed_login, find_unclosed_login_ids
+from calculations import has_unclosed_login, find_unclosed_login_ids, calculate_work_hours_in_window
 
 
 def ev(computer, action, ts, is_work=True):
@@ -168,6 +168,80 @@ class TestCalculateWorkHours:
 
     def test_no_events_returns_zero(self):
         assert calculate_work_hours([], [], NOW) == pytest.approx(0.0)
+
+
+class TestCalculateWorkHoursInWindow:
+    """calculate_work_hours_in_window uses global event context and clips to a window."""
+
+    W_START = datetime(2026, 5, 20, 0, 0)   # start of May 20
+    W_END   = datetime(2026, 5, 21, 0, 0)   # end of May 20
+    NOW     = datetime(2026, 5, 21, 14, 0)
+
+    def test_normal_session_within_window(self):
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 17, 0)),
+        ]
+        result = calculate_work_hours_in_window(events, [], self.W_START, self.W_END, self.NOW)
+        assert result == pytest.approx(8.0)
+
+    def test_cross_day_session_clipped_to_window(self):
+        # Session starts May 19 22:00, ends May 20 06:00 → only 6h fall in May 20 window
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 19, 22, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 6, 0)),
+        ]
+        result = calculate_work_hours_in_window(events, [], self.W_START, self.W_END, self.NOW)
+        assert result == pytest.approx(6.0)
+
+    def test_orphaned_login_overwritten_by_subsequent_login_not_counted(self):
+        # Scenario matching the production bug:
+        # - Long session ends with logout on May 20 at 09:46 (login was May 16, is_work=False)
+        # - New work login fires at May 20 09:54 (orphaned — overwritten by May 21 login)
+        # - May 21 login (is_work=False) → logout May 22
+        # Per-day view of May 20 would see orphaned login as open → inflates hours.
+        # Global view correctly overwrites it and produces 0 event hours.
+        events = [
+            ev("pc", "login",  datetime(2026, 5, 16, 14, 46), is_work=False),
+            ev("pc", "logout", datetime(2026, 5, 20, 9, 46)),
+            ev("pc", "login",  datetime(2026, 5, 20, 9, 54)),   # orphaned
+            ev("pc", "login",  datetime(2026, 5, 21, 8, 29), is_work=False),  # overwrites
+            ev("pc", "logout", datetime(2026, 5, 22, 23, 8)),
+        ]
+        result = calculate_work_hours_in_window(events, [], self.W_START, self.W_END, self.NOW)
+        assert result == pytest.approx(0.0)
+
+    def test_session_outside_window_not_counted(self):
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 19, 9, 0)),
+            ev("ubuntu", "logout", datetime(2026, 5, 19, 17, 0)),
+        ]
+        result = calculate_work_hours_in_window(events, [], self.W_START, self.W_END, self.NOW)
+        assert result == pytest.approx(0.0)
+
+    def test_manual_entries_added(self):
+        m = manual(date(2026, 5, 20), 8.0)
+        result = calculate_work_hours_in_window([], [m], self.W_START, self.W_END, self.NOW)
+        assert result == pytest.approx(8.0)
+
+    def test_non_work_session_excluded(self):
+        events = [
+            ev("ubuntu", "login",  datetime(2026, 5, 20, 9, 0), is_work=False),
+            ev("ubuntu", "logout", datetime(2026, 5, 20, 17, 0)),
+        ]
+        result = calculate_work_hours_in_window(events, [], self.W_START, self.W_END, self.NOW)
+        assert result == pytest.approx(0.0)
+
+    def test_overlapping_computers_merged(self):
+        # Two computers both working 9–12: merged = 3h, not 6h
+        events = [
+            ev("ubuntu",  "login",  datetime(2026, 5, 20, 9, 0)),
+            ev("ubuntu",  "logout", datetime(2026, 5, 20, 12, 0)),
+            ev("windows", "login",  datetime(2026, 5, 20, 9, 0)),
+            ev("windows", "logout", datetime(2026, 5, 20, 12, 0)),
+        ]
+        result = calculate_work_hours_in_window(events, [], self.W_START, self.W_END, self.NOW)
+        assert result == pytest.approx(3.0)
 
 
 class TestCalculatePerComputerHours:

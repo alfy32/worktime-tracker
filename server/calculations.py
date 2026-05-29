@@ -104,6 +104,35 @@ def calculate_work_hours(
     return total
 
 
+def calculate_work_hours_in_window(
+    all_events: list,
+    manual_entries: list,
+    window_start: datetime,
+    window_end: datetime,
+    now: datetime,
+) -> float:
+    """
+    Total merged work hours within [window_start, window_end).
+
+    Computes sessions from the full event history per computer so that consecutive
+    logins without a logout (orphaned logins) are correctly overwritten rather than
+    treated as open sessions. Each session is then clipped to the window before
+    summing. Manual entries are added in full.
+    """
+    clipped: list[tuple[datetime, datetime]] = []
+    for computer in {e.computer for e in all_events}:
+        computer_events = [e for e in all_events if e.computer == computer]
+        for start, end in get_sessions(computer_events, now):
+            cs = max(start, window_start)
+            ce = min(end, window_end)
+            if cs < ce:
+                clipped.append((cs, ce))
+    merged = merge_intervals(clipped)
+    total = sum((e - s).total_seconds() / 3600 for s, e in merged)
+    total += sum(m.hours for m in manual_entries)
+    return total
+
+
 def calculate_per_computer_hours(events: list, now: datetime) -> dict[str, float]:
     """Hours per computer without merging (overlapping time counted on each)."""
     result: dict[str, float] = {}

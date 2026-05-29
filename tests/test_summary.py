@@ -168,8 +168,9 @@ def test_cross_day_session_counts_in_both_daily_and_weekly(client):
     may19 = next(d for d in daily_resp.json()["days"] if d["date"] == "2026-05-19")
     may20 = next(d for d in daily_resp.json()["days"] if d["date"] == "2026-05-20")
     assert may19["is_invalid"] is False
+    assert may20["is_invalid"] is False
     assert may19["hours"] == pytest.approx(1.0)   # 23:00–00:00
-    assert may20["hours"] == pytest.approx(0.0)   # orphan logout, no contribution
+    assert may20["hours"] == pytest.approx(1.0)   # 00:00–01:00 (session clipped to May 20)
 
     weekly_resp = client.get("/api/summary/weekly?weeks=2")
     week_of_may18 = next(w for w in weekly_resp.json()["weeks"] if w["week_start"] == "2026-05-18")

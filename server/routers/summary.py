@@ -9,7 +9,7 @@ from schemas import (
     SessionOut, ComputerStatus, DayBreakdown, DayStats, WeekStats,
 )
 from calculations import (
-    calculate_work_hours, calculate_per_computer_hours,
+    calculate_work_hours, calculate_work_hours_in_window, calculate_per_computer_hours,
     calculate_hours_bank, calculate_stop_time,
     get_sessions, merge_intervals, remaining_weekdays_in_week, weekdays_elapsed,
     has_unclosed_login, find_unclosed_login_ids,
@@ -146,18 +146,19 @@ def summary_week(db: Session = Depends(get_db)):
 
     adjusted_target = max(0.0, min(cfg["weekly_target"] - bank_at_week_start, cfg["weekly_target"] * 1.5))
 
+    valid_all_week = [e for e in all_events if e.id not in unclosed_ids]
     breakdown = []
     total_hours = 0.0
     for i in range(7):
         d = week_start + timedelta(days=i)
         if d > today:
             break
-        d_events_raw = _day_events(db, d)
-        d_manual     = _day_manual(db, d)
-        d_events     = [e for e in d_events_raw if e.id not in unclosed_ids] if d < today else d_events_raw
-        end_of_day   = datetime.combine(d + timedelta(days=1), datetime.min.time())
-        cutoff       = now if d == today else end_of_day
-        hours        = calculate_work_hours(d_events, d_manual, cutoff)
+        d_manual   = _day_manual(db, d)
+        day_start  = datetime.combine(d, datetime.min.time())
+        end_of_day = datetime.combine(d + timedelta(days=1), datetime.min.time())
+        cutoff     = now if d == today else end_of_day
+        ev_pool    = all_events if d == today else valid_all_week
+        hours      = calculate_work_hours_in_window(ev_pool, d_manual, day_start, cutoff, now)
         total_hours += hours
         breakdown.append(DayBreakdown(date=d, hours=round(hours, 2), is_today=(d == today)))
 
@@ -175,13 +176,19 @@ def summary_week(db: Session = Depends(get_db)):
     )
 
 
-def _longest_break(events: list, now: datetime) -> float:
-    """Find the longest gap between merged sessions for a single day's events."""
-    all_sessions = []
+def _longest_break_in_window(
+    events: list, window_start: datetime, window_end: datetime, now: datetime
+) -> float:
+    """Longest gap between work sessions within [window_start, window_end)."""
+    clipped = []
     for computer in {e.computer for e in events}:
         comp_events = [e for e in events if e.computer == computer]
-        all_sessions.extend(get_sessions(comp_events, now))
-    merged = merge_intervals(all_sessions)
+        for start, end in get_sessions(comp_events, now):
+            cs = max(start, window_start)
+            ce = min(end, window_end)
+            if cs < ce:
+                clipped.append((cs, ce))
+    merged = merge_intervals(clipped)
     if len(merged) < 2:
         return 0.0
     max_gap = 0.0
@@ -193,29 +200,34 @@ def _longest_break(events: list, now: datetime) -> float:
 
 @router.get("/api/summary/daily", response_model=DailySummary)
 def summary_daily(days: int = 60, db: Session = Depends(get_db)):
-    now   = datetime.now()
-    today = now.date()
+    now          = datetime.now()
+    today        = now.date()
     all_events   = db.query(Event).all()
     unclosed_ids = find_unclosed_login_ids(all_events, today)
+    valid_all    = [e for e in all_events if e.id not in unclosed_ids]
     result = []
     for i in range(days - 1, -1, -1):
-        d            = today - timedelta(days=i)
-        d_events_raw = _day_events(db, d)
-        d_manual     = _day_manual(db, d)
-        end_of_day   = datetime.combine(d + timedelta(days=1), datetime.min.time())
-        cutoff       = now if d == today else end_of_day
-        d_events     = [e for e in d_events_raw if e.id not in unclosed_ids] if d < today else d_events_raw
-        hours        = calculate_work_hours(d_events, d_manual, cutoff)
+        d          = today - timedelta(days=i)
+        d_manual   = _day_manual(db, d)
+        day_start  = datetime.combine(d, datetime.min.time())
+        end_of_day = datetime.combine(d + timedelta(days=1), datetime.min.time())
+        cutoff     = now if d == today else end_of_day
+        ev_pool    = all_events if d == today else valid_all
+        hours      = calculate_work_hours_in_window(ev_pool, d_manual, day_start, cutoff, now)
         sessions_count = sum(
-            len(get_sessions([e for e in d_events if e.computer == c], cutoff))
-            for c in {e.computer for e in d_events}
+            1
+            for computer in {e.computer for e in ev_pool}
+            for start, _ in get_sessions([e for e in ev_pool if e.computer == computer], now)
+            if day_start <= start < cutoff
         )
-        is_invalid = d < today and bool({e.id for e in d_events_raw} & unclosed_ids)
+        is_invalid = d < today and any(
+            e.id in unclosed_ids and e.timestamp.date() == d for e in all_events
+        )
         result.append(DayStats(
             date=d,
             hours=round(hours, 2),
             session_count=sessions_count,
-            longest_break_hours=_longest_break(d_events, cutoff),
+            longest_break_hours=_longest_break_in_window(ev_pool, day_start, cutoff, now),
             is_invalid=is_invalid,
         ))
     return DailySummary(days=result)
@@ -228,22 +240,20 @@ def summary_weekly(weeks: int = 26, db: Session = Depends(get_db)):
     week_start = today - timedelta(days=today.weekday())
     all_events   = db.query(Event).all()
     unclosed_ids = find_unclosed_login_ids(all_events, today)
-    result     = []
+    valid_all_weekly = [e for e in all_events if e.id not in unclosed_ids]
+    result = []
     for i in range(weeks - 1, -1, -1):
         ws = week_start - timedelta(weeks=i)
         we = ws + timedelta(days=6)
-        w_events_raw = db.query(Event).filter(
-            Event.timestamp >= datetime.combine(ws, datetime.min.time()),
-            Event.timestamp <  datetime.combine(we + timedelta(days=1), datetime.min.time()),
-        ).all()
         w_manual = db.query(ManualEntry).filter(
             ManualEntry.date >= ws,
             ManualEntry.date <= min(we, today),
         ).all()
-        end_of_week = datetime.combine(we + timedelta(days=1), datetime.min.time())
-        cap      = now if we >= today else end_of_week
-        w_events = [e for e in w_events_raw if e.id not in unclosed_ids] if we < today else w_events_raw
-        total = calculate_work_hours(w_events, w_manual, cap)
+        ws_dt = datetime.combine(ws, datetime.min.time())
+        we_dt = datetime.combine(we + timedelta(days=1), datetime.min.time())
+        cap      = now if we >= today else we_dt
+        ev_pool  = all_events if we >= today else valid_all_weekly
+        total = calculate_work_hours_in_window(ev_pool, w_manual, ws_dt, cap, now)
         worked_days = weekdays_elapsed(ws, min(we + timedelta(days=1), today + timedelta(days=1)))
         avg = round(total / worked_days, 2) if worked_days else 0.0
         result.append(WeekStats(
