@@ -210,7 +210,6 @@ def test_week_detail_empty_days_have_no_sessions(client):
         assert day["hours"] == 0.0
 
 
-@freeze_time("2026-05-20 14:00:00")
 def test_week_detail_includes_manual_entries(client):
     client.post("/api/manual", json={"date": "2026-05-19", "hours": 2.0, "note": "training"})
     resp = client.get("/api/summary/week/2026-05-18")
