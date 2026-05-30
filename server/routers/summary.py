@@ -7,6 +7,7 @@ from models import Event, ManualEntry, Settings
 from schemas import (
     TodaySummary, WeekSummary, DailySummary, WeeklySummary,
     SessionOut, ComputerStatus, DayBreakdown, DayStats, WeekStats,
+    DayDetail, WeekDetail, ManualEntryOut,
 )
 from calculations import (
     calculate_work_hours, calculate_work_hours_in_window, calculate_per_computer_hours,
@@ -263,3 +264,51 @@ def summary_weekly(weeks: int = 26, db: Session = Depends(get_db)):
             delta_from_40=round(total - 40.0, 2),
         ))
     return WeeklySummary(weeks=result)
+
+
+@router.get("/api/summary/week/{week_start}", response_model=WeekDetail)
+def summary_week_detail(week_start: date, db: Session = Depends(get_db)):
+    now = datetime.now()
+    today = now.date()
+
+    all_events = db.query(Event).all()
+    unclosed_ids = find_unclosed_login_ids(all_events, today)
+    valid_all = [e for e in all_events if e.id not in unclosed_ids]
+
+    # Build sessions once from each pool to correctly handle cross-midnight sessions.
+    # Filter per day by login_at.date() to assign each session to its start day.
+    sessions_valid = build_sessions(valid_all, now)
+    sessions_today = build_sessions(all_events, now)
+
+    days = []
+    for i in range(7):
+        d = week_start + timedelta(days=i)
+        if d > today:
+            break
+
+        d_manual = _day_manual(db, d)
+        day_start = datetime.combine(d, datetime.min.time())
+        end_of_day = datetime.combine(d + timedelta(days=1), datetime.min.time())
+        cutoff = now if d == today else end_of_day
+        ev_pool = all_events if d == today else valid_all
+
+        hours = calculate_work_hours_in_window(ev_pool, d_manual, day_start, cutoff, now)
+
+        sessions_pool = sessions_today if d == today else sessions_valid
+        day_sessions = [s for s in sessions_pool if s.login_at.date() == d]
+
+        is_invalid = d < today and any(
+            e.id in unclosed_ids and e.timestamp.date() == d for e in all_events
+        )
+
+        days.append(DayDetail(
+            date=d,
+            hours=round(hours, 2),
+            session_count=len(day_sessions),
+            longest_break_hours=_longest_break_in_window(ev_pool, day_start, cutoff, now),
+            is_invalid=is_invalid,
+            sessions=day_sessions,
+            manual_entries=d_manual,
+        ))
+
+    return WeekDetail(week_start=week_start, days=days)

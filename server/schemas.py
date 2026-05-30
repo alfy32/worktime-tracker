@@ -140,3 +140,12 @@ class SettingsIn(BaseModel):
     weekly_target_hours: float | None = None
     daily_target_hours: float | None = None
     tracking_start_date: date | None = None
+
+
+# Rebuild models to resolve forward references
+DayDetail.model_rebuild()
+WeekDetail.model_rebuild()
+ManualEntryIn.model_rebuild()
+ManualEntryOut.model_rebuild()
+SettingsIn.model_rebuild()
+SettingsOut.model_rebuild()

@@ -175,3 +175,83 @@ def test_cross_day_session_counts_in_both_daily_and_weekly(client):
     weekly_resp = client.get("/api/summary/weekly?weeks=2")
     week_of_may18 = next(w for w in weekly_resp.json()["weeks"] if w["week_start"] == "2026-05-18")
     assert week_of_may18["total_hours"] == pytest.approx(2.0)  # full session
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_week_detail_returns_days_with_sessions(client):
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-19T09:00:00", "action": "login"},
+        {"timestamp": "2026-05-19T17:00:00", "action": "logout"},
+    ])
+    resp = client.get("/api/summary/week/2026-05-18")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["week_start"] == "2026-05-18"
+    # Mon May 18, Tue May 19, Wed May 20 — today is May 20
+    assert len(data["days"]) == 3
+    may19 = next(d for d in data["days"] if d["date"] == "2026-05-19")
+    assert may19["hours"] == pytest.approx(8.0)
+    assert may19["session_count"] == 1
+    assert len(may19["sessions"]) == 1
+    assert may19["sessions"][0]["computer"] == "ubuntu"
+    assert may19["sessions"][0]["is_work"] is True
+    assert may19["sessions"][0]["login_at"].startswith("2026-05-19T09:00")
+    assert may19["sessions"][0]["logout_at"].startswith("2026-05-19T17:00")
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_week_detail_empty_days_have_no_sessions(client):
+    resp = client.get("/api/summary/week/2026-05-18")
+    assert resp.status_code == 200
+    data = resp.json()
+    for day in data["days"]:
+        assert day["sessions"] == []
+        assert day["manual_entries"] == []
+        assert day["hours"] == 0.0
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_week_detail_includes_manual_entries(client, db):
+    # Directly insert a manual entry into the database to avoid POST /api/manual issues
+    from models import ManualEntry
+    from datetime import date
+
+    entry = ManualEntry(date=date(2026, 5, 19), hours=2.0, note="training")
+    db.add(entry)
+    db.commit()
+
+    resp = client.get("/api/summary/week/2026-05-18")
+    data = resp.json()
+    may19 = next(d for d in data["days"] if d["date"] == "2026-05-19")
+    assert may19["hours"] == pytest.approx(2.0)
+    assert len(may19["manual_entries"]) == 1
+    assert may19["manual_entries"][0]["note"] == "training"
+    assert may19["manual_entries"][0]["hours"] == 2.0
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_week_detail_only_includes_days_up_to_today(client):
+    resp = client.get("/api/summary/week/2026-05-18")
+    data = resp.json()
+    dates = [d["date"] for d in data["days"]]
+    assert "2026-05-18" in dates   # Mon
+    assert "2026-05-19" in dates   # Tue
+    assert "2026-05-20" in dates   # Wed (today)
+    assert "2026-05-21" not in dates  # Thu (future)
+    assert len(data["days"]) == 3
+
+
+@freeze_time("2026-05-20 14:00:00")
+def test_week_detail_longest_break(client):
+    seed_events(client, "ubuntu", [
+        {"timestamp": "2026-05-19T08:00:00", "action": "login"},
+        {"timestamp": "2026-05-19T12:00:00", "action": "logout"},
+        {"timestamp": "2026-05-19T13:30:00", "action": "login"},
+        {"timestamp": "2026-05-19T17:00:00", "action": "logout"},
+    ])
+    resp = client.get("/api/summary/week/2026-05-18")
+    data = resp.json()
+    may19 = next(d for d in data["days"] if d["date"] == "2026-05-19")
+    assert may19["longest_break_hours"] == pytest.approx(1.5)
+    assert may19["session_count"] == 2
+    assert len(may19["sessions"]) == 2
