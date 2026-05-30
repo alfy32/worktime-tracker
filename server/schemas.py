@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, date
 from typing import Literal
 from pydantic import BaseModel, Field
@@ -69,6 +71,21 @@ class DayStats(BaseModel):
     session_count: int
     longest_break_hours: float
     is_invalid: bool = False
+
+
+class DayDetail(BaseModel):
+    date: date
+    hours: float
+    session_count: int
+    longest_break_hours: float
+    is_invalid: bool = False
+    sessions: list[SessionOut]
+    manual_entries: list["ManualEntryOut"]
+
+
+class WeekDetail(BaseModel):
+    week_start: date
+    days: list[DayDetail]
 
 
 class DailySummary(BaseModel):
