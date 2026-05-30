@@ -19,6 +19,7 @@ const api = (() => {
     getWeekSummary:    ()           => _fetch('/api/summary/week'),
     getDailySummary:   (days  = 60) => _fetch('/api/summary/daily?days='  + days),
     getWeeklySummary:  (weeks = 26) => _fetch('/api/summary/weekly?weeks=' + weeks),
+    getWeekDetail:     (weekStart)  => _fetch('/api/summary/week/' + weekStart),
     getComputers:      ()           => _fetch('/api/sessions/computers'),
     getSessions:       (page = 1, perPage = 50) =>
       _fetch('/api/sessions?page=' + page + '&per_page=' + perPage),
