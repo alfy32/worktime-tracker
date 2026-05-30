@@ -73,6 +73,15 @@ class DayStats(BaseModel):
     is_invalid: bool = False
 
 
+class ManualEntryOut(BaseModel):
+    id: int
+    date: date
+    hours: float
+    note: str | None
+
+    model_config = {"from_attributes": True}
+
+
 class DayDetail(BaseModel):
     date: date
     hours: float
@@ -80,7 +89,7 @@ class DayDetail(BaseModel):
     longest_break_hours: float
     is_invalid: bool = False
     sessions: list[SessionOut]
-    manual_entries: list["ManualEntryOut"]
+    manual_entries: list[ManualEntryOut]
 
 
 class WeekDetail(BaseModel):
@@ -121,15 +130,6 @@ class ManualEntryIn(BaseModel):
     note: str | None = None
 
 
-class ManualEntryOut(BaseModel):
-    id: int
-    date: date
-    hours: float
-    note: str | None
-
-    model_config = {"from_attributes": True}
-
-
 class SettingsOut(BaseModel):
     weekly_target_hours: float
     daily_target_hours: float
@@ -140,12 +140,3 @@ class SettingsIn(BaseModel):
     weekly_target_hours: float | None = None
     daily_target_hours: float | None = None
     tracking_start_date: date | None = None
-
-
-# Rebuild models to resolve forward references
-DayDetail.model_rebuild()
-WeekDetail.model_rebuild()
-ManualEntryIn.model_rebuild()
-ManualEntryOut.model_rebuild()
-SettingsIn.model_rebuild()
-SettingsOut.model_rebuild()

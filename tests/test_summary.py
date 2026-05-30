@@ -211,15 +211,8 @@ def test_week_detail_empty_days_have_no_sessions(client):
 
 
 @freeze_time("2026-05-20 14:00:00")
-def test_week_detail_includes_manual_entries(client, db):
-    # Directly insert a manual entry into the database to avoid POST /api/manual issues
-    from models import ManualEntry
-    from datetime import date
-
-    entry = ManualEntry(date=date(2026, 5, 19), hours=2.0, note="training")
-    db.add(entry)
-    db.commit()
-
+def test_week_detail_includes_manual_entries(client):
+    client.post("/api/manual", json={"date": "2026-05-19", "hours": 2.0, "note": "training"})
     resp = client.get("/api/summary/week/2026-05-18")
     data = resp.json()
     may19 = next(d for d in data["days"] if d["date"] == "2026-05-19")
